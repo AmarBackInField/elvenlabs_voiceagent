@@ -25,3 +25,6 @@ pydantic>=2.5.0
 
 # Settings management
 pydantic-settings>=2.1.0
+
+# Form data and file uploads
+python-multipart>=0.0.6
