@@ -782,14 +782,16 @@ POST /api/v1/phone-numbers/sip-trunk
   "supports_outbound": true,
   "outbound_trunk_config": {
     "address": "voiceagent.fibrapro.it",
-    "authentication": {
+    "transport": "auto",
+    "media_encryption": "allowed",
+    "credentials": {
       "username": "+390620199287",
       "password": "your_password"
     }
   },
   "inbound_trunk_config": {
     "address": "sip.rtc.elevenlabs.io:5060",
-    "authentication": {
+    "credentials": {
       "username": "+390620199287",
       "password": "your_password"
     }
@@ -813,9 +815,17 @@ POST /api/v1/phone-numbers/sip-trunk
 | `provider` | Must be `"sip_trunk"` |
 | `supports_inbound` | Enable inbound calls (default: true) |
 | `supports_outbound` | Enable outbound calls (default: true) |
-| `outbound_trunk_config.sip_uri` | Your SIP provider's URI for outbound calls |
-| `outbound_trunk_config.authentication` | Username/password for SIP auth |
-| `inbound_trunk_config.sip_uri` | ElevenLabs SIP endpoint: `sip.rtc.elevenlabs.io:5060` |
+
+**Trunk Config (outbound/inbound) Fields:**
+
+| Field | Description | Required |
+|-------|-------------|----------|
+| `address` | Hostname or IP the SIP INVITE is sent to | Yes |
+| `transport` | Protocol: `auto`, `udp`, `tcp`, `tls` | No |
+| `media_encryption` | Encryption: `disabled`, `allowed`, `required` | No |
+| `headers` | Custom SIP X-* headers (key-value map) | No |
+| `credentials.username` | SIP digest auth username | No |
+| `credentials.password` | SIP digest auth password | No |
 
 > **Note:** The ElevenLabs inbound SIP endpoint is `sip.rtc.elevenlabs.io:5060`. Configure your SIP provider to route inbound calls to this endpoint.
 

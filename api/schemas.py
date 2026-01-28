@@ -142,10 +142,10 @@ class ImportPhoneNumberRequest(BaseModel):
         }
 
 
-class SIPTrunkAuthConfig(BaseModel):
-    """SIP trunk authentication configuration."""
-    username: str = Field(..., description="SIP username")
-    password: str = Field(..., description="SIP password")
+class SIPTrunkCredentials(BaseModel):
+    """SIP trunk credentials for digest authentication."""
+    username: str = Field(..., description="SIP trunk username")
+    password: Optional[str] = Field(None, description="SIP trunk password")
     
     class Config:
         extra = "allow"
@@ -153,10 +153,11 @@ class SIPTrunkAuthConfig(BaseModel):
 
 class SIPTrunkConfig(BaseModel):
     """SIP trunk inbound/outbound configuration."""
-    address: str = Field(..., description="SIP address/URI (e.g., sip.provider.com or sip:user@provider.com)")
-    authentication: Optional[SIPTrunkAuthConfig] = Field(None, description="SIP authentication credentials")
-    codecs: Optional[List[str]] = Field(None, description="Supported codecs (e.g., ['PCMU', 'PCMA'])")
-    dtmf_mode: Optional[str] = Field(None, description="DTMF mode (e.g., 'rfc2833')")
+    address: str = Field(..., description="Hostname or IP the SIP INVITE is sent to")
+    transport: Optional[str] = Field(None, description="Transport protocol: auto, udp, tcp, tls")
+    media_encryption: Optional[str] = Field(None, description="Media encryption: disabled, allowed, required")
+    headers: Optional[Dict[str, str]] = Field(None, description="SIP X-* headers for INVITE request")
+    credentials: Optional[SIPTrunkCredentials] = Field(None, description="Digest authentication credentials")
     
     class Config:
         extra = "allow"
@@ -182,14 +183,16 @@ class ImportSIPTrunkPhoneNumberRequest(BaseModel):
                 "supports_outbound": True,
                 "outbound_trunk_config": {
                     "address": "voiceagent.fibrapro.it",
-                    "authentication": {
+                    "transport": "auto",
+                    "media_encryption": "allowed",
+                    "credentials": {
                         "username": "+390620199287",
                         "password": "your_password"
                     }
                 },
                 "inbound_trunk_config": {
                     "address": "sip.rtc.elevenlabs.io:5060",
-                    "authentication": {
+                    "credentials": {
                         "username": "+390620199287",
                         "password": "your_password"
                     }

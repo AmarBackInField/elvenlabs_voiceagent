@@ -108,29 +108,33 @@ async def import_sip_trunk_phone_number(
         # Add outbound trunk config
         if request.outbound_trunk_config:
             outbound_config = {"address": request.outbound_trunk_config.address}
-            if request.outbound_trunk_config.authentication:
-                outbound_config["authentication"] = {
-                    "username": request.outbound_trunk_config.authentication.username,
-                    "password": request.outbound_trunk_config.authentication.password
-                }
-            if request.outbound_trunk_config.codecs:
-                outbound_config["codecs"] = request.outbound_trunk_config.codecs
-            if request.outbound_trunk_config.dtmf_mode:
-                outbound_config["dtmf_mode"] = request.outbound_trunk_config.dtmf_mode
+            if request.outbound_trunk_config.credentials:
+                creds = {"username": request.outbound_trunk_config.credentials.username}
+                if request.outbound_trunk_config.credentials.password:
+                    creds["password"] = request.outbound_trunk_config.credentials.password
+                outbound_config["credentials"] = creds
+            if request.outbound_trunk_config.transport:
+                outbound_config["transport"] = request.outbound_trunk_config.transport
+            if request.outbound_trunk_config.media_encryption:
+                outbound_config["media_encryption"] = request.outbound_trunk_config.media_encryption
+            if request.outbound_trunk_config.headers:
+                outbound_config["headers"] = request.outbound_trunk_config.headers
             payload["outbound_trunk_config"] = outbound_config
         
         # Add inbound trunk config
         if request.inbound_trunk_config:
             inbound_config = {"address": request.inbound_trunk_config.address}
-            if request.inbound_trunk_config.authentication:
-                inbound_config["authentication"] = {
-                    "username": request.inbound_trunk_config.authentication.username,
-                    "password": request.inbound_trunk_config.authentication.password
-                }
-            if request.inbound_trunk_config.codecs:
-                inbound_config["codecs"] = request.inbound_trunk_config.codecs
-            if request.inbound_trunk_config.dtmf_mode:
-                inbound_config["dtmf_mode"] = request.inbound_trunk_config.dtmf_mode
+            if request.inbound_trunk_config.credentials:
+                creds = {"username": request.inbound_trunk_config.credentials.username}
+                if request.inbound_trunk_config.credentials.password:
+                    creds["password"] = request.inbound_trunk_config.credentials.password
+                inbound_config["credentials"] = creds
+            if request.inbound_trunk_config.transport:
+                inbound_config["transport"] = request.inbound_trunk_config.transport
+            if request.inbound_trunk_config.media_encryption:
+                inbound_config["media_encryption"] = request.inbound_trunk_config.media_encryption
+            if request.inbound_trunk_config.headers:
+                inbound_config["headers"] = request.inbound_trunk_config.headers
             payload["inbound_trunk_config"] = inbound_config
         
         logger.info(f"Importing SIP trunk phone number: {request.phone_number}")
