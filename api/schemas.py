@@ -153,7 +153,7 @@ class SIPTrunkAuthConfig(BaseModel):
 
 class SIPTrunkConfig(BaseModel):
     """SIP trunk inbound/outbound configuration."""
-    sip_uri: str = Field(..., description="SIP URI (e.g., sip.provider.com)")
+    address: str = Field(..., description="SIP address/URI (e.g., sip.provider.com or sip:user@provider.com)")
     authentication: Optional[SIPTrunkAuthConfig] = Field(None, description="SIP authentication credentials")
     codecs: Optional[List[str]] = Field(None, description="Supported codecs (e.g., ['PCMU', 'PCMA'])")
     dtmf_mode: Optional[str] = Field(None, description="DTMF mode (e.g., 'rfc2833')")
@@ -181,14 +181,14 @@ class ImportSIPTrunkPhoneNumberRequest(BaseModel):
                 "supports_inbound": True,
                 "supports_outbound": True,
                 "outbound_trunk_config": {
-                    "sip_uri": "voiceagent.fibrapro.it",
+                    "address": "voiceagent.fibrapro.it",
                     "authentication": {
                         "username": "+390620199287",
                         "password": "your_password"
                     }
                 },
                 "inbound_trunk_config": {
-                    "sip_uri": "sip.rtc.elevenlabs.io:5060",
+                    "address": "sip.rtc.elevenlabs.io:5060",
                     "authentication": {
                         "username": "+390620199287",
                         "password": "your_password"

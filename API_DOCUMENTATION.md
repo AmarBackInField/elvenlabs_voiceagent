@@ -781,14 +781,14 @@ POST /api/v1/phone-numbers/sip-trunk
   "supports_inbound": true,
   "supports_outbound": true,
   "outbound_trunk_config": {
-    "sip_uri": "voiceagent.fibrapro.it",
+    "address": "voiceagent.fibrapro.it",
     "authentication": {
       "username": "+390620199287",
       "password": "your_password"
     }
   },
   "inbound_trunk_config": {
-    "sip_uri": "sip.rtc.elevenlabs.io:5060",
+    "address": "sip.rtc.elevenlabs.io:5060",
     "authentication": {
       "username": "+390620199287",
       "password": "your_password"

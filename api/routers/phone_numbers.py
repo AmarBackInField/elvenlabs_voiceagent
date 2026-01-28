@@ -107,7 +107,7 @@ async def import_sip_trunk_phone_number(
         
         # Add outbound trunk config
         if request.outbound_trunk_config:
-            outbound_config = {"sip_uri": request.outbound_trunk_config.sip_uri}
+            outbound_config = {"address": request.outbound_trunk_config.address}
             if request.outbound_trunk_config.authentication:
                 outbound_config["authentication"] = {
                     "username": request.outbound_trunk_config.authentication.username,
@@ -121,7 +121,7 @@ async def import_sip_trunk_phone_number(
         
         # Add inbound trunk config
         if request.inbound_trunk_config:
-            inbound_config = {"sip_uri": request.inbound_trunk_config.sip_uri}
+            inbound_config = {"address": request.inbound_trunk_config.address}
             if request.inbound_trunk_config.authentication:
                 inbound_config["authentication"] = {
                     "username": request.inbound_trunk_config.authentication.username,
