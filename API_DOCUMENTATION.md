@@ -764,7 +764,62 @@ POST /api/v1/phone-numbers
 }
 ```
 
-### 8.2 List Phone Numbers
+### 8.2 Import Phone Number from SIP Trunk Provider
+
+For non-Twilio SIP providers (Vonage, Fibrapro, etc.)
+
+```
+POST /api/v1/phone-numbers/sip-trunk
+```
+
+**Request Body:**
+```json
+{
+  "phone_number": "+390620199287",
+  "label": "Italy SIP Line",
+  "provider": "sip_trunk",
+  "supports_inbound": true,
+  "supports_outbound": true,
+  "outbound_trunk_config": {
+    "sip_uri": "voiceagent.fibrapro.it",
+    "authentication": {
+      "username": "+390620199287",
+      "password": "your_password"
+    }
+  },
+  "inbound_trunk_config": {
+    "sip_uri": "sip.rtc.elevenlabs.io:5060",
+    "authentication": {
+      "username": "+390620199287",
+      "password": "your_password"
+    }
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "phone_number_id": "phnum_sip123xyz"
+}
+```
+
+**SIP Trunk Configuration Fields:**
+
+| Field | Description |
+|-------|-------------|
+| `phone_number` | Your SIP phone number in E.164 format |
+| `label` | Display name for the number |
+| `provider` | Must be `"sip_trunk"` |
+| `supports_inbound` | Enable inbound calls (default: true) |
+| `supports_outbound` | Enable outbound calls (default: true) |
+| `outbound_trunk_config.sip_uri` | Your SIP provider's URI for outbound calls |
+| `outbound_trunk_config.authentication` | Username/password for SIP auth |
+| `inbound_trunk_config.sip_uri` | ElevenLabs SIP endpoint: `sip.rtc.elevenlabs.io:5060` |
+
+> **Note:** The ElevenLabs inbound SIP endpoint is `sip.rtc.elevenlabs.io:5060`. Configure your SIP provider to route inbound calls to this endpoint.
+
+### 8.3 List Phone Numbers
 
 ```
 GET /api/v1/phone-numbers?page_size=30
@@ -778,14 +833,22 @@ GET /api/v1/phone-numbers?page_size=30
       "phone_number_id": "phnum_abc123",
       "phone_number": "+14155551234",
       "label": "Customer Support Line",
-      "agent_id": null
+      "agent_id": null,
+      "provider": "twilio"
+    },
+    {
+      "phone_number_id": "phnum_sip456",
+      "phone_number": "+390620199287",
+      "label": "Italy SIP Line",
+      "agent_id": null,
+      "provider": "sip_trunk"
     }
   ],
   "cursor": null
 }
 ```
 
-### 8.3 Assign Agent to Phone Number
+### 8.4 Assign Agent to Phone Number
 
 This enables the agent to handle incoming calls on this number.
 
@@ -811,75 +874,30 @@ PATCH /api/v1/phone-numbers/{phone_number_id}
 }
 ```
 
-### 8.4 Delete Phone Number
+### 8.5 Delete Phone Number
 
 ```
 DELETE /api/v1/phone-numbers/{phone_number_id}
 ```
 
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Phone number phnum_abc123 deleted successfully"
+}
+```
+
 ---
 
-## 8.5 SIP Trunk Configuration
+### Phone Number Provider Comparison
 
-For non-Twilio providers (Vonage, Bandwidth, etc.).
+| Provider | Import Endpoint | Required Fields |
+|----------|----------------|-----------------|
+| **Twilio** | `POST /phone-numbers` | `phone_number`, `label`, `sid`, `token` |
+| **SIP Trunk** | `POST /phone-numbers/sip-trunk` | `phone_number`, `label`, `provider`, `outbound_trunk_config` |
 
-### Create SIP Trunk
-
-```
-POST /api/v1/sip-trunk
-```
-
-**Request Body:**
-```json
-{
-  "name": "Vonage SIP Trunk",
-  "sip_uri": "sip:your-number@sip.vonage.com",
-  "authentication": {
-    "username": "your_username",
-    "password": "your_password"
-  }
-}
-```
-
-**Response:**
-```json
-{
-  "sip_trunk_id": "sip_abc123",
-  "name": "Vonage SIP Trunk",
-  "sip_uri": "sip:your-number@sip.vonage.com"
-}
-```
-
-### List SIP Trunks
-
-```
-GET /api/v1/sip-trunk
-```
-
-**Response:**
-```json
-{
-  "sip_trunks": [
-    {
-      "sip_trunk_id": "sip_abc123",
-      "name": "Vonage SIP Trunk",
-      "sip_uri": "sip:your-number@sip.vonage.com"
-    }
-  ]
-}
-```
-
-### Get SIP Trunk Details
-
-```
-GET /api/v1/sip-trunk/{sip_trunk_id}
-```
-
-### Delete SIP Trunk
-
-```
-DELETE /api/v1/sip-trunk/{sip_trunk_id}
-```
+> **Note:** Both Twilio and SIP trunk phone numbers can be used for outbound calls. Use the respective outbound call endpoint based on your provider.
 
 ---
 

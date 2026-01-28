@@ -125,7 +125,7 @@ class UpdateAgentRequest(BaseModel):
 # =============================================================================
 
 class ImportPhoneNumberRequest(BaseModel):
-    """Request schema for importing a phone number."""
+    """Request schema for importing a phone number from Twilio."""
     phone_number: str = Field(..., description="Phone number in E.164 format")
     label: str = Field(..., description="Label for the phone number")
     sid: str = Field(..., description="Provider SID (Twilio Account SID)")
@@ -138,6 +138,62 @@ class ImportPhoneNumberRequest(BaseModel):
                 "label": "Customer Support Line",
                 "sid": "ACXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
                 "token": "your_auth_token"
+            }
+        }
+
+
+class SIPTrunkAuthConfig(BaseModel):
+    """SIP trunk authentication configuration."""
+    username: str = Field(..., description="SIP username")
+    password: str = Field(..., description="SIP password")
+    
+    class Config:
+        extra = "allow"
+
+
+class SIPTrunkConfig(BaseModel):
+    """SIP trunk inbound/outbound configuration."""
+    sip_uri: str = Field(..., description="SIP URI (e.g., sip.provider.com)")
+    authentication: Optional[SIPTrunkAuthConfig] = Field(None, description="SIP authentication credentials")
+    codecs: Optional[List[str]] = Field(None, description="Supported codecs (e.g., ['PCMU', 'PCMA'])")
+    dtmf_mode: Optional[str] = Field(None, description="DTMF mode (e.g., 'rfc2833')")
+    
+    class Config:
+        extra = "allow"
+
+
+class ImportSIPTrunkPhoneNumberRequest(BaseModel):
+    """Request schema for importing a phone number from SIP trunk provider."""
+    phone_number: str = Field(..., description="Phone number in E.164 format")
+    label: str = Field(..., description="Label for the phone number")
+    provider: str = Field("sip_trunk", description="Provider type (must be 'sip_trunk')")
+    supports_inbound: bool = Field(True, description="Whether this phone number supports inbound calls")
+    supports_outbound: bool = Field(True, description="Whether this phone number supports outbound calls")
+    inbound_trunk_config: Optional[SIPTrunkConfig] = Field(None, description="Inbound SIP trunk configuration")
+    outbound_trunk_config: Optional[SIPTrunkConfig] = Field(None, description="Outbound SIP trunk configuration")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "phone_number": "+390620199287",
+                "label": "Italy SIP Line",
+                "provider": "sip_trunk",
+                "supports_inbound": True,
+                "supports_outbound": True,
+                "outbound_trunk_config": {
+                    "sip_uri": "voiceagent.fibrapro.it",
+                    "authentication": {
+                        "username": "+390620199287",
+                        "password": "your_password"
+                    }
+                },
+                "inbound_trunk_config": {
+                    "sip_uri": "sip.rtc.elevenlabs.io:5060",
+                    "authentication": {
+                        "username": "+390620199287",
+                        "password": "your_password"
+                    }
+                }
             }
         }
 

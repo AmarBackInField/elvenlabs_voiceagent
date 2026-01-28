@@ -3,6 +3,7 @@ Phone Numbers Router.
 Handles phone number import and management endpoints.
 """
 
+import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -10,6 +11,7 @@ from client import ElevenLabsClient
 from api.dependencies import get_client
 from api.schemas import (
     ImportPhoneNumberRequest,
+    ImportSIPTrunkPhoneNumberRequest,
     ImportPhoneNumberResponse,
     PhoneNumberResponse,
     PhoneNumberListResponse,
@@ -21,6 +23,7 @@ from api.schemas import (
 )
 from exceptions import ElevenLabsError, NotFoundError
 
+logger = logging.getLogger("elevenlabs.phone_numbers.router")
 
 router = APIRouter(
     prefix="/phone-numbers",
@@ -36,21 +39,23 @@ router = APIRouter(
     "",
     response_model=ImportPhoneNumberResponse,
     status_code=201,
-    summary="Import Phone Number",
-    description="Import a phone number from Twilio or SIP trunk provider"
+    summary="Import Phone Number (Twilio)",
+    description="Import a phone number from Twilio"
 )
 async def import_phone_number(
     request: ImportPhoneNumberRequest,
     client: ElevenLabsClient = Depends(get_client)
 ):
     """
-    Import a phone number from your provider configuration.
+    Import a phone number from Twilio.
     
     Requires:
     - phone_number: Number in E.164 format (e.g., +14155551234)
     - label: Display name for the number
-    - sid: Provider Account SID (Twilio)
-    - token: Provider authentication token
+    - sid: Twilio Account SID
+    - token: Twilio authentication token
+    
+    For SIP trunk providers, use POST /phone-numbers/sip-trunk instead.
     """
     try:
         result = client.phone_numbers.import_phone_number(
@@ -59,6 +64,80 @@ async def import_phone_number(
             sid=request.sid,
             token=request.token
         )
+        return ImportPhoneNumberResponse(phone_number_id=result["phone_number_id"])
+        
+    except ElevenLabsError as e:
+        raise HTTPException(status_code=e.status_code or 500, detail=str(e))
+
+
+@router.post(
+    "/sip-trunk",
+    response_model=ImportPhoneNumberResponse,
+    status_code=201,
+    summary="Import Phone Number (SIP Trunk)",
+    description="Import a phone number from a SIP trunk provider"
+)
+async def import_sip_trunk_phone_number(
+    request: ImportSIPTrunkPhoneNumberRequest,
+    client: ElevenLabsClient = Depends(get_client)
+):
+    """
+    Import a phone number from a SIP trunk provider.
+    
+    This endpoint is for non-Twilio SIP providers (Vonage, Fibrapro, etc.)
+    
+    Requires:
+    - phone_number: Number in E.164 format (e.g., +390620199287)
+    - label: Display name for the number
+    - provider: Must be "sip_trunk"
+    - outbound_trunk_config: SIP URI and authentication for outbound calls
+    - inbound_trunk_config: SIP URI and authentication for inbound calls (optional)
+    
+    The ElevenLabs inbound SIP endpoint is: sip.rtc.elevenlabs.io:5060
+    """
+    try:
+        # Build the payload for ElevenLabs API
+        payload = {
+            "phone_number": request.phone_number,
+            "label": request.label,
+            "provider": "sip_trunk",
+            "supports_inbound": request.supports_inbound,
+            "supports_outbound": request.supports_outbound
+        }
+        
+        # Add outbound trunk config
+        if request.outbound_trunk_config:
+            outbound_config = {"sip_uri": request.outbound_trunk_config.sip_uri}
+            if request.outbound_trunk_config.authentication:
+                outbound_config["authentication"] = {
+                    "username": request.outbound_trunk_config.authentication.username,
+                    "password": request.outbound_trunk_config.authentication.password
+                }
+            if request.outbound_trunk_config.codecs:
+                outbound_config["codecs"] = request.outbound_trunk_config.codecs
+            if request.outbound_trunk_config.dtmf_mode:
+                outbound_config["dtmf_mode"] = request.outbound_trunk_config.dtmf_mode
+            payload["outbound_trunk_config"] = outbound_config
+        
+        # Add inbound trunk config
+        if request.inbound_trunk_config:
+            inbound_config = {"sip_uri": request.inbound_trunk_config.sip_uri}
+            if request.inbound_trunk_config.authentication:
+                inbound_config["authentication"] = {
+                    "username": request.inbound_trunk_config.authentication.username,
+                    "password": request.inbound_trunk_config.authentication.password
+                }
+            if request.inbound_trunk_config.codecs:
+                inbound_config["codecs"] = request.inbound_trunk_config.codecs
+            if request.inbound_trunk_config.dtmf_mode:
+                inbound_config["dtmf_mode"] = request.inbound_trunk_config.dtmf_mode
+            payload["inbound_trunk_config"] = inbound_config
+        
+        logger.info(f"Importing SIP trunk phone number: {request.phone_number}")
+        
+        # Call ElevenLabs API directly with the SIP trunk payload
+        result = client.phone_numbers.import_sip_trunk_phone_number(payload)
+        
         return ImportPhoneNumberResponse(phone_number_id=result["phone_number_id"])
         
     except ElevenLabsError as e:

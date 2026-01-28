@@ -98,6 +98,57 @@ class PhoneNumberService(BaseClient):
             self.logger.info(f"Phone number imported: {phone_id}")
             return response
     
+    def import_sip_trunk_phone_number(
+        self,
+        payload: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Import a phone number from SIP trunk provider.
+        
+        API Endpoint: POST /v1/convai/phone-numbers
+        
+        Args:
+            payload: Complete SIP trunk phone number configuration including:
+                - phone_number: Phone number in E.164 format
+                - label: Label for the phone number
+                - provider: "sip_trunk"
+                - supports_inbound: Boolean
+                - supports_outbound: Boolean
+                - outbound_trunk_config: SIP configuration for outbound calls
+                - inbound_trunk_config: SIP configuration for inbound calls
+            
+        Returns:
+            Response containing phone_number_id
+            
+        Example:
+            >>> result = service.import_sip_trunk_phone_number({
+            ...     "phone_number": "+390620199287",
+            ...     "label": "Italy SIP Line",
+            ...     "provider": "sip_trunk",
+            ...     "supports_inbound": True,
+            ...     "supports_outbound": True,
+            ...     "outbound_trunk_config": {
+            ...         "sip_uri": "voiceagent.fibrapro.it",
+            ...         "authentication": {
+            ...             "username": "+390620199287",
+            ...             "password": "password"
+            ...         }
+            ...     }
+            ... })
+            >>> print(result["phone_number_id"])
+        """
+        with APICallLogger(self.logger, "Import SIP Trunk Phone Number", 
+                          phone_number=payload.get("phone_number")):
+            response = self._make_request(
+                method="POST",
+                endpoint=self.PHONE_NUMBERS_ENDPOINT,
+                data=payload
+            )
+            
+            phone_id = response.get("phone_number_id", "unknown")
+            self.logger.info(f"SIP trunk phone number imported: {phone_id}")
+            return response
+    
     def get_phone_number(self, phone_number_id: str) -> Dict[str, Any]:
         """
         Get details of a specific phone number.
