@@ -26,16 +26,17 @@ class UpdateAgentPromptRequest(BaseModel):
     first_message: Optional[str] = Field(None, description="Initial greeting message")
     language: Optional[str] = Field(None, description="Agent language (e.g., 'en', 'it', 'es')")
     system_prompt: Optional[str] = Field(None, description="System prompt defining agent behavior")
-    tool_ids: Optional[List[str]] = Field(None, description="List of tool IDs to enable")
+    tool_ids: Optional[List[str]] = Field(None, description="List of tool IDs to enable (replaces existing tools)")
     knowledge_base_ids: Optional[List[str]] = Field(None, description="List of knowledge base document IDs")
     
     class Config:
         json_schema_extra = {
             "example": {
-                "first_message": "Ciao! Come posso aiutarti oggi?",
-                "language": "it",
-                "knowledge_base_ids": ["doc123", "doc456"],
-                "system_prompt": "Sei un assistente utile per il negozio online."
+                "first_message": "Hello! How can I help you today?",
+                "language": "en",
+                "system_prompt": "You are a helpful customer support agent.",
+                "tool_ids": ["tool_products_abc123", "tool_orders_def456", "tool_email_xyz789"],
+                "knowledge_base_ids": ["doc_faq123", "doc_policies456"]
             }
         }
 
