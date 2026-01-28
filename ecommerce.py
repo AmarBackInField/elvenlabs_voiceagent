@@ -419,3 +419,127 @@ def get_ecommerce_service() -> EcommerceService:
     if _ecommerce_service is None:
         _ecommerce_service = EcommerceService()
     return _ecommerce_service
+
+
+# =============================================================================
+# Batch Job Context Store
+# =============================================================================
+
+class BatchJobContextStore:
+    """
+    Store for batch job context (e-commerce credentials, recipient info).
+    Used to look up context when webhook calls come in from batch jobs.
+    """
+    
+    def __init__(self):
+        """Initialize batch job context store."""
+        # job_id -> {ecommerce_credentials, sender_email, agent_id}
+        self._jobs: Dict[str, Dict[str, Any]] = {}
+        # agent_id -> job_id (most recent)
+        self._agent_jobs: Dict[str, str] = {}
+        # phone_number -> {name, email, job_id}
+        self._recipients: Dict[str, Dict[str, Any]] = {}
+        logger.info("BatchJobContextStore initialized")
+    
+    def store_job(
+        self,
+        job_id: str,
+        agent_id: str,
+        ecommerce_credentials: Optional[Dict[str, Any]] = None,
+        sender_email: Optional[str] = None,
+        recipients: Optional[List[Dict[str, Any]]] = None
+    ) -> None:
+        """
+        Store batch job context.
+        
+        Args:
+            job_id: Batch job ID
+            agent_id: Agent ID handling the calls
+            ecommerce_credentials: E-commerce platform credentials
+            sender_email: Sender email for email templates
+            recipients: List of recipients with name/email
+        """
+        self._jobs[job_id] = {
+            "agent_id": agent_id,
+            "ecommerce_credentials": ecommerce_credentials,
+            "sender_email": sender_email
+        }
+        self._agent_jobs[agent_id] = job_id
+        
+        # Store recipient info by phone number
+        if recipients:
+            for r in recipients:
+                phone = r.get("phone_number")
+                if phone:
+                    self._recipients[phone] = {
+                        "name": r.get("name"),
+                        "email": r.get("email"),
+                        "job_id": job_id,
+                        "agent_id": agent_id
+                    }
+        
+        logger.info(f"Stored batch job context: job_id={job_id}, agent_id={agent_id}, recipients={len(recipients or [])}")
+    
+    def get_job(self, job_id: str) -> Optional[Dict[str, Any]]:
+        """Get batch job context by job ID."""
+        return self._jobs.get(job_id)
+    
+    def get_job_by_agent(self, agent_id: str) -> Optional[Dict[str, Any]]:
+        """Get most recent batch job context by agent ID."""
+        job_id = self._agent_jobs.get(agent_id)
+        if job_id:
+            job = self._jobs.get(job_id)
+            if job:
+                job["job_id"] = job_id
+                return job
+        return None
+    
+    def get_recipient_by_phone(self, phone_number: str) -> Optional[Dict[str, Any]]:
+        """Get recipient info by phone number."""
+        return self._recipients.get(phone_number)
+    
+    def get_ecommerce_credentials(self, agent_id: str) -> Optional[Dict[str, Any]]:
+        """Get e-commerce credentials for an agent's batch job."""
+        job = self.get_job_by_agent(agent_id)
+        if job:
+            return job.get("ecommerce_credentials")
+        return None
+    
+    def get_sender_email(self, agent_id: str) -> Optional[str]:
+        """Get sender email for an agent's batch job."""
+        job = self.get_job_by_agent(agent_id)
+        if job:
+            return job.get("sender_email")
+        return None
+    
+    def remove_job(self, job_id: str) -> None:
+        """Remove batch job context."""
+        job = self._jobs.get(job_id)
+        if job:
+            agent_id = job.get("agent_id")
+            if agent_id and self._agent_jobs.get(agent_id) == job_id:
+                del self._agent_jobs[agent_id]
+            del self._jobs[job_id]
+            
+            # Clean up recipients for this job
+            to_remove = [phone for phone, info in self._recipients.items() if info.get("job_id") == job_id]
+            for phone in to_remove:
+                del self._recipients[phone]
+            
+            logger.info(f"Removed batch job context: job_id={job_id}")
+    
+    def list_jobs(self) -> Dict[str, Dict[str, Any]]:
+        """List all batch job contexts (for debugging)."""
+        return self._jobs.copy()
+
+
+# Global batch job context store
+_batch_job_context: Optional[BatchJobContextStore] = None
+
+
+def get_batch_job_context() -> BatchJobContextStore:
+    """Get or create the global batch job context store."""
+    global _batch_job_context
+    if _batch_job_context is None:
+        _batch_job_context = BatchJobContextStore()
+    return _batch_job_context

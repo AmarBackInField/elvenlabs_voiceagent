@@ -50,6 +50,8 @@ async def webhook_get_products(request: Request):
     
     The agent will call this when user asks about products, inventory, etc.
     Returns product information as text that the agent can read to the user.
+    
+    Supports both single calls (with conversation_id) and batch calls (looks up by agent_id).
     """
     try:
         # Parse the request body
@@ -64,35 +66,55 @@ async def webhook_get_products(request: Request):
             body.get("call_id")
         )
         
+        # Extract agent_id for batch call lookups
+        agent_id = body.get("agent_id") or body.get("agentId")
+        
         limit = body.get("limit", 5)
         if isinstance(limit, str):
             limit = int(limit)
         limit = min(max(limit, 1), 20)
         
-        if not conversation_id:
-            logger.warning("No conversation_id in webhook request")
-            return WebhookResponse(
-                success=False,
-                error="No ecommerce platform connected. Please provide store credentials when starting the call."
-            )
-        
-        # Get products from ecommerce service
+        # Get ecommerce service
         ecommerce_service = get_ecommerce_service()
         
-        # Debug logging
-        logger.info(f"Looking up ecommerce client for conversation_id: {conversation_id}")
-        client = ecommerce_service.get_client(conversation_id)
-        if client:
-            logger.info(f"Found client: platform={client.platform}, base_url={client.base_url}")
-        else:
-            logger.warning(f"No client found for conversation_id: {conversation_id}")
-            logger.info(f"Active sessions: {list(ecommerce_service._clients.keys())}")
+        # Try to get client by conversation_id first
+        client = None
+        if conversation_id:
+            client = ecommerce_service.get_client(conversation_id)
+            logger.info(f"Looking up ecommerce client for conversation_id: {conversation_id}")
         
-        result = ecommerce_service.get_products(session_id=conversation_id, limit=limit)
+        # If no client found, try batch job context by agent_id
+        if not client and agent_id:
+            from ecommerce import get_batch_job_context
+            batch_context = get_batch_job_context()
+            ecom_creds = batch_context.get_ecommerce_credentials(agent_id)
+            
+            if ecom_creds:
+                logger.info(f"Found batch job ecommerce credentials for agent_id: {agent_id}")
+                # Create client for this conversation using batch job credentials
+                session_key = conversation_id or f"batch_{agent_id}"
+                client = ecommerce_service.create_client(
+                    session_id=session_key,
+                    platform=ecom_creds.get("platform"),
+                    base_url=ecom_creds.get("base_url"),
+                    api_key=ecom_creds.get("api_key"),
+                    api_secret=ecom_creds.get("api_secret"),
+                    access_token=ecom_creds.get("access_token")
+                )
+        
+        if not client:
+            logger.warning(f"No ecommerce client found for conversation_id={conversation_id}, agent_id={agent_id}")
+            return WebhookResponse(
+                success=False,
+                error="No ecommerce platform connected. Please provide store credentials when starting the call or batch job."
+            )
+        
+        logger.info(f"Found client: platform={client.platform}, base_url={client.base_url}")
+        result = client.get_products(limit=limit)
         
         if result.get("success"):
             formatted = result.get("formatted", "No products found.")
-            logger.info(f"Products fetched successfully for conversation {conversation_id}")
+            logger.info(f"Products fetched successfully")
             return WebhookResponse(success=True, data=formatted)
         else:
             error = result.get("error", "Failed to fetch products")
@@ -122,6 +144,8 @@ async def webhook_get_orders(request: Request):
     
     The agent will call this when user asks about orders, order status, etc.
     Returns order information as text that the agent can read to the user.
+    
+    Supports both single calls (with conversation_id) and batch calls (looks up by agent_id).
     """
     try:
         # Parse the request body
@@ -136,25 +160,55 @@ async def webhook_get_orders(request: Request):
             body.get("call_id")
         )
         
+        # Extract agent_id for batch call lookups
+        agent_id = body.get("agent_id") or body.get("agentId")
+        
         limit = body.get("limit", 5)
         if isinstance(limit, str):
             limit = int(limit)
         limit = min(max(limit, 1), 20)
         
-        if not conversation_id:
-            logger.warning("No conversation_id in webhook request")
+        # Get ecommerce service
+        ecommerce_service = get_ecommerce_service()
+        
+        # Try to get client by conversation_id first
+        client = None
+        if conversation_id:
+            client = ecommerce_service.get_client(conversation_id)
+            logger.info(f"Looking up ecommerce client for conversation_id: {conversation_id}")
+        
+        # If no client found, try batch job context by agent_id
+        if not client and agent_id:
+            from ecommerce import get_batch_job_context
+            batch_context = get_batch_job_context()
+            ecom_creds = batch_context.get_ecommerce_credentials(agent_id)
+            
+            if ecom_creds:
+                logger.info(f"Found batch job ecommerce credentials for agent_id: {agent_id}")
+                # Create client for this conversation using batch job credentials
+                session_key = conversation_id or f"batch_{agent_id}"
+                client = ecommerce_service.create_client(
+                    session_id=session_key,
+                    platform=ecom_creds.get("platform"),
+                    base_url=ecom_creds.get("base_url"),
+                    api_key=ecom_creds.get("api_key"),
+                    api_secret=ecom_creds.get("api_secret"),
+                    access_token=ecom_creds.get("access_token")
+                )
+        
+        if not client:
+            logger.warning(f"No ecommerce client found for conversation_id={conversation_id}, agent_id={agent_id}")
             return WebhookResponse(
                 success=False,
-                error="No ecommerce platform connected. Please provide store credentials when starting the call."
+                error="No ecommerce platform connected. Please provide store credentials when starting the call or batch job."
             )
         
-        # Get orders from ecommerce service
-        ecommerce_service = get_ecommerce_service()
-        result = ecommerce_service.get_orders(session_id=conversation_id, limit=limit)
+        logger.info(f"Found client: platform={client.platform}, base_url={client.base_url}")
+        result = client.get_orders(limit=limit)
         
         if result.get("success"):
             formatted = result.get("formatted", "No orders found.")
-            logger.info(f"Orders fetched successfully for conversation {conversation_id}")
+            logger.info(f"Orders fetched successfully")
             return WebhookResponse(success=True, data=formatted)
         else:
             error = result.get("error", "Failed to fetch orders")
@@ -210,11 +264,14 @@ async def email_webhook(template_id: str, request: Request):
     
     This endpoint:
     1. Receives the tool call with conversation_id and parameters
-    2. Looks up customer info from the session store
+    2. Looks up customer info from the session store or batch job context
     3. Fills the email template with parameters
     4. Sends the email via external API
+    
+    Supports both single calls and batch calls.
     """
     from email_templates import get_email_template_service, customer_sessions
+    from ecommerce import get_batch_job_context
     
     try:
         body = await request.json()
@@ -228,21 +285,58 @@ async def email_webhook(template_id: str, request: Request):
             body.get("call_id")
         )
         
-        if not conversation_id:
-            logger.warning("No conversation_id in email webhook request")
-            return WebhookResponse(
-                success=False,
-                data="Missing conversation_id in request"
-            )
+        # Extract agent_id and phone number for batch job lookup
+        agent_id = body.get("agent_id") or body.get("agentId")
+        to_phone = body.get("to_number") or body.get("phone_number") or body.get("recipient_phone")
         
-        # Get customer info from session
-        customer_info = customer_sessions.get(conversation_id)
+        # Try to get customer info from session store first
+        customer_info = None
+        sender_email = None
+        
+        if conversation_id:
+            customer_info = customer_sessions.get(conversation_id)
+        
+        # If no customer info found, try batch job context
+        if not customer_info:
+            batch_context = get_batch_job_context()
+            
+            # Try lookup by phone number first (most specific)
+            if to_phone:
+                recipient_info = batch_context.get_recipient_by_phone(to_phone)
+                if recipient_info:
+                    customer_info = {
+                        "name": recipient_info.get("name"),
+                        "email": recipient_info.get("email")
+                    }
+                    # Get sender email from the job
+                    job_agent_id = recipient_info.get("agent_id")
+                    if job_agent_id:
+                        sender_email = batch_context.get_sender_email(job_agent_id)
+                    logger.info(f"Found customer info from batch job by phone: {to_phone}")
+            
+            # Try lookup by agent_id if still no customer info
+            if not customer_info and agent_id:
+                job = batch_context.get_job_by_agent(agent_id)
+                if job:
+                    sender_email = job.get("sender_email")
+                    logger.info(f"Found batch job context for agent_id: {agent_id}")
+        else:
+            sender_email = customer_info.get("sender_email")
         
         if not customer_info:
-            logger.warning(f"No customer session found for conversation {conversation_id}")
+            logger.warning(f"No customer info found for conversation_id={conversation_id}, agent_id={agent_id}, phone={to_phone}")
             return WebhookResponse(
                 success=False,
-                data=f"No customer info found for conversation {conversation_id}. Please store customer session first."
+                data=f"No customer info found. Please provide customer_info when starting the call or include email in batch recipients."
+            )
+        
+        # Verify we have an email address
+        customer_email = customer_info.get("email") or customer_info.get("customer_email")
+        if not customer_email:
+            logger.warning(f"No email address in customer info: {customer_info}")
+            return WebhookResponse(
+                success=False,
+                data="No email address found for this customer. Please include email in recipient info."
             )
         
         # Get email template service
@@ -257,13 +351,18 @@ async def email_webhook(template_id: str, request: Request):
             )
         
         # Extract parameters (exclude known fields)
+        exclude_fields = [
+            "conversation_id", "conversationId", "session_id", "call_id",
+            "agent_id", "agentId", "to_number", "phone_number", "recipient_phone"
+        ]
         parameters = {
             k: v for k, v in body.items() 
-            if k not in ["conversation_id", "conversationId", "session_id", "call_id"]
+            if k not in exclude_fields
         }
         
-        # Get sender_email from customer_info (set during call initiation)
-        sender_email = customer_info.get("sender_email", "amarc8399@gmail.com")
+        # Default sender email
+        if not sender_email:
+            sender_email = "amarc8399@gmail.com"
         
         # Send the email
         result = service.send_email(
@@ -276,7 +375,7 @@ async def email_webhook(template_id: str, request: Request):
         if result.get("success"):
             return WebhookResponse(
                 success=True,
-                data=f"Email sent successfully to {customer_info.get('email')}"
+                data=f"Email sent successfully to {customer_email}"
             )
         else:
             return WebhookResponse(

@@ -394,6 +394,7 @@ class BatchRecipient(BaseModel):
     """Single recipient in a batch call."""
     phone_number: str = Field(..., description="Destination phone number")
     name: Optional[str] = Field(None, description="Recipient name")
+    email: Optional[str] = Field(None, description="Recipient email (for email templates)")
     dynamic_variables: Optional[Dict[str, str]] = Field(
         None, 
         description="Call-specific variables"
@@ -412,6 +413,14 @@ class SubmitBatchJobRequest(BaseModel):
     scheduled_time_unix: Optional[int] = Field(None, description="Unix timestamp for scheduling")
     timezone: Optional[str] = Field(None, description="Timezone for scheduling")
     retry_count: int = Field(default=0, ge=0, le=5, description="Retry attempts for failed calls")
+    ecommerce_credentials: Optional[EcommerceCredentials] = Field(
+        None,
+        description="E-commerce credentials for product/order lookups during calls (applies to all calls in batch)"
+    )
+    sender_email: Optional[str] = Field(
+        None,
+        description="Email of the sender/business (used as x-user-email when sending emails)"
+    )
     
     class Config:
         json_schema_extra = {
@@ -422,15 +431,24 @@ class SubmitBatchJobRequest(BaseModel):
                     {
                         "phone_number": "+14155551234",
                         "name": "John Doe",
+                        "email": "john@example.com",
                         "dynamic_variables": {"appointment": "Feb 1, 2026"}
                     },
                     {
                         "phone_number": "+14155555678",
                         "name": "Jane Smith",
+                        "email": "jane@example.com",
                         "dynamic_variables": {"appointment": "Feb 2, 2026"}
                     }
                 ],
-                "retry_count": 2
+                "retry_count": 2,
+                "ecommerce_credentials": {
+                    "platform": "woocommerce",
+                    "base_url": "https://mystore.com",
+                    "api_key": "ck_xxxxx",
+                    "api_secret": "cs_xxxxx"
+                },
+                "sender_email": "support@mycompany.com"
             }
         }
 

@@ -980,7 +980,7 @@ POST /api/v1/sip-trunk/outbound-call
 POST /api/v1/batch-calling/submit
 ```
 
-**Request Body:**
+**Request Body (Basic):**
 ```json
 {
   "call_name": "Q1 Appointment Reminders",
@@ -992,6 +992,35 @@ POST /api/v1/batch-calling/submit
       "name": "John Doe",
       "dynamic_variables": {
         "customer_name": "John",
+        "appointment_date": "February 1, 2026"
+      }
+    },
+    {
+      "phone_number": "+14155552222",
+      "name": "Jane Smith",
+      "dynamic_variables": {
+        "customer_name": "Jane",
+        "appointment_date": "February 1, 2026"
+      }
+    }
+  ],
+  "retry_count": 2
+}
+```
+
+**Request Body (Full - with E-commerce & Email Templates):**
+```json
+{
+  "call_name": "Q1 Customer Outreach Campaign",
+  "agent_id": "agent_abc123xyz",
+  "phone_number_id": "phnum_abc123",
+  "recipients": [
+    {
+      "phone_number": "+14155551111",
+      "name": "John Doe",
+      "email": "john@example.com",
+      "dynamic_variables": {
+        "customer_name": "John",
         "appointment_date": "February 1, 2026",
         "appointment_time": "10:00 AM"
       }
@@ -999,6 +1028,7 @@ POST /api/v1/batch-calling/submit
     {
       "phone_number": "+14155552222",
       "name": "Jane Smith",
+      "email": "jane@example.com",
       "dynamic_variables": {
         "customer_name": "Jane",
         "appointment_date": "February 1, 2026",
@@ -1008,6 +1038,7 @@ POST /api/v1/batch-calling/submit
     {
       "phone_number": "+14155553333",
       "name": "Bob Johnson",
+      "email": "bob@example.com",
       "dynamic_variables": {
         "customer_name": "Bob",
         "appointment_date": "February 2, 2026",
@@ -1017,7 +1048,14 @@ POST /api/v1/batch-calling/submit
   ],
   "scheduled_time_unix": 1738400400,
   "timezone": "America/New_York",
-  "retry_count": 2
+  "retry_count": 2,
+  "ecommerce_credentials": {
+    "platform": "woocommerce",
+    "base_url": "https://mystore.com",
+    "api_key": "ck_xxxxx",
+    "api_secret": "cs_xxxxx"
+  },
+  "sender_email": "support@mycompany.com"
 }
 ```
 
@@ -1037,6 +1075,30 @@ POST /api/v1/batch-calling/submit
   "total_calls_scheduled": 3,
   "total_calls_finished": 0,
   "retry_count": 2
+}
+```
+
+### Batch Calling with E-commerce & Email Templates
+
+To enable e-commerce lookups and email sending during batch calls:
+
+1. **E-commerce**: Add `ecommerce_credentials` to the batch job request. All calls in the batch will have access to product/order lookups.
+
+2. **Email Templates**: Include `email` field for each recipient. The agent can then send emails to customers during calls.
+
+3. **Sender Email**: Set `sender_email` to specify the business email used as the sender.
+
+### Recipient Object Structure
+
+```json
+{
+  "phone_number": "+14155551234",  // Required, E.164 format
+  "name": "Customer Name",         // Optional, for personalization
+  "email": "customer@example.com", // Optional, required for email templates
+  "dynamic_variables": {           // Optional, injected into conversation
+    "custom_field_1": "value1",
+    "custom_field_2": "value2"
+  }
 }
 ```
 

@@ -3,6 +3,7 @@ Batch Calling Router.
 Handles batch calling job submission and management endpoints.
 """
 
+import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -18,6 +19,7 @@ from api.schemas import (
 )
 from exceptions import ElevenLabsError, NotFoundError
 
+logger = logging.getLogger("elevenlabs.batch_calling.router")
 
 router = APIRouter(
     prefix="/batch-calling",
@@ -46,18 +48,29 @@ async def submit_batch_job(
     The agent will sequentially or concurrently call each recipient.
     You can include dynamic variables for personalization per recipient.
     
+    Features:
+    - Include ecommerce_credentials to enable product/order lookups during all calls
+    - Include recipient email addresses to enable email templates during calls
+    - Include sender_email for the business/sender email header
+    
     Example use cases:
-    - Marketing campaigns
-    - Appointment reminders
+    - Marketing campaigns with product info
+    - Appointment reminders with confirmation emails
     - Customer surveys
     - Payment reminders
     """
     try:
-        # Convert recipients to dict format
-        recipients = [
-            r.model_dump(exclude_none=True) 
-            for r in request.recipients
-        ]
+        # Convert recipients to dict format (exclude email as ElevenLabs doesn't need it)
+        recipients = []
+        for r in request.recipients:
+            recipient_data = {
+                "phone_number": r.phone_number
+            }
+            if r.name:
+                recipient_data["name"] = r.name
+            if r.dynamic_variables:
+                recipient_data["dynamic_variables"] = r.dynamic_variables
+            recipients.append(recipient_data)
         
         result = client.batch_calling.submit_job(
             call_name=request.call_name,
@@ -68,6 +81,43 @@ async def submit_batch_job(
             timezone=request.timezone,
             retry_count=request.retry_count
         )
+        
+        job_id = result.get("id")
+        
+        # Store batch job context for webhooks
+        if request.ecommerce_credentials or request.sender_email or any(r.email for r in request.recipients):
+            from ecommerce import get_batch_job_context
+            batch_context = get_batch_job_context()
+            
+            # Prepare ecommerce credentials dict
+            ecom_creds = None
+            if request.ecommerce_credentials:
+                ecom_creds = request.ecommerce_credentials.model_dump()
+            
+            # Prepare recipient list with email info
+            recipients_with_email = [
+                {
+                    "phone_number": r.phone_number,
+                    "name": r.name,
+                    "email": r.email
+                }
+                for r in request.recipients
+            ]
+            
+            batch_context.store_job(
+                job_id=job_id,
+                agent_id=request.agent_id,
+                ecommerce_credentials=ecom_creds,
+                sender_email=request.sender_email,
+                recipients=recipients_with_email
+            )
+            
+            logger.info(
+                f"Batch job {job_id} context stored: "
+                f"ecommerce={'enabled' if ecom_creds else 'disabled'}, "
+                f"sender_email={request.sender_email or 'none'}, "
+                f"recipients_with_email={sum(1 for r in request.recipients if r.email)}"
+            )
         
         return BatchJobResponse(**result)
         
