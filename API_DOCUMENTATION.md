@@ -232,12 +232,16 @@ POST /api/v1/knowledge-base/text
 **Response:**
 ```json
 {
-  "document_id": "doc_faq123",
+  "document_id": "KBDoc_abc123xyz",
+  "id": "KBDoc_abc123xyz",
   "name": "Company FAQ",
   "folder_path": null,
-  "source_type": "text"
+  "source_type": "text",
+  "status": "processing"
 }
 ```
+
+> **Note:** Use the `document_id` (or `id`) value when attaching to agents via `knowledge_base_ids`.
 
 ### 4.2 Create Document from URL
 
@@ -259,10 +263,12 @@ POST /api/v1/knowledge-base/url
 **Response:**
 ```json
 {
-  "document_id": "doc_about456",
+  "document_id": "KBDoc_def456uvw",
+  "id": "KBDoc_def456uvw",
   "name": "About Us Page",
   "folder_path": null,
-  "source_type": "url"
+  "source_type": "url",
+  "status": "processing"
 }
 ```
 
@@ -290,10 +296,12 @@ curl -X POST "https://your-api.com/api/v1/knowledge-base/file" \
 **Response:**
 ```json
 {
-  "document_id": "doc_catalog789",
+  "document_id": "KBDoc_ghi789rst",
+  "id": "KBDoc_ghi789rst",
   "name": "Product Catalog 2026",
   "folder_path": null,
-  "source_type": "file"
+  "source_type": "file",
+  "status": "processing"
 }
 ```
 
@@ -325,14 +333,18 @@ GET /api/v1/knowledge-base?page_size=30&cursor=optional
 {
   "documents": [
     {
-      "document_id": "doc_faq123",
+      "id": "KBDoc_abc123xyz",
       "name": "Company FAQ",
-      "source_type": "text"
+      "type": "file",
+      "status": "ready",
+      "created_at_unix": 1738310400
     },
     {
-      "document_id": "doc_about456",
+      "id": "KBDoc_def456uvw",
       "name": "About Us Page",
-      "source_type": "url"
+      "type": "file",
+      "status": "ready",
+      "created_at_unix": 1738310500
     }
   ],
   "cursor": null
@@ -345,13 +357,33 @@ GET /api/v1/knowledge-base?page_size=30&cursor=optional
 GET /api/v1/knowledge-base/{document_id}
 ```
 
+**Response:**
+```json
+{
+  "document_id": "KBDoc_abc123xyz",
+  "id": "KBDoc_abc123xyz",
+  "name": "Company FAQ",
+  "type": "file",
+  "status": "ready",
+  "created_at_unix": 1738310400
+}
+```
+
 ### 4.7 Delete Document
 
 ```
 DELETE /api/v1/knowledge-base/{document_id}
 ```
 
-> **Important:** Save the `document_id` values. You'll need them when creating agents.
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Document KBDoc_abc123xyz deleted successfully"
+}
+```
+
+> **Important:** Save the `id` or `document_id` values. You'll need them when creating agents via `knowledge_base_ids`.
 
 ---
 
