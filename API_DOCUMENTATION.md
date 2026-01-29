@@ -1138,6 +1138,15 @@ POST /api/v1/batch-calling/submit
 }
 ```
 
+### Required Fields for Batch Calling
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `call_name` | Yes | Campaign/job name |
+| `agent_id` | Yes | Agent ID to handle all calls |
+| `phone_number_id` | Yes | Phone number ID for caller ID (from phone number import) |
+| `recipients` | Yes | Array of recipients to call |
+
 ### Batch Calling with E-commerce & Email Templates
 
 To enable e-commerce lookups and email sending during batch calls:

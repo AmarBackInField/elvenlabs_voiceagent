@@ -467,8 +467,8 @@ class SubmitBatchJobRequest(BaseModel):
     """Request for submitting a batch calling job."""
     call_name: str = Field(..., description="Campaign/job name")
     agent_id: str = Field(..., description="Agent ID to handle calls")
+    phone_number_id: str = Field(..., description="Phone number ID for caller ID (required for outbound calls)")
     recipients: List[BatchRecipient] = Field(..., description="List of recipients")
-    phone_number_id: Optional[str] = Field(None, description="Phone number ID for caller ID")
     scheduled_time_unix: Optional[int] = Field(None, description="Unix timestamp for scheduling")
     timezone: Optional[str] = Field(None, description="Timezone for scheduling")
     retry_count: int = Field(default=0, ge=0, le=5, description="Retry attempts for failed calls")
@@ -486,6 +486,7 @@ class SubmitBatchJobRequest(BaseModel):
             "example": {
                 "call_name": "Q1 Customer Outreach",
                 "agent_id": "J3Pbu5gP6NNKBscdCdwB",
+                "phone_number_id": "phnum_abc123xyz",
                 "recipients": [
                     {
                         "phone_number": "+14155551234",
