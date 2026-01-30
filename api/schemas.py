@@ -661,8 +661,12 @@ class CreateEmailTemplateRequest(BaseModel):
     )
     webhook_base_url: Optional[str] = Field(
         None,
-        description="Base URL for webhook (e.g., https://your-ngrok.ngrok-free.app/api/v1)"
+        description="Base URL for webhook (e.g., https://your-ngrok.ngrok-free.app/api/v1)",
+        alias="webhook_url"
     )
+    
+    class Config:
+        populate_by_name = True  # Allow both webhook_base_url and webhook_url
     
     class Config:
         json_schema_extra = {

@@ -203,7 +203,7 @@ class EmailTemplateService:
     
     def _create_webhook_tool(self, template: EmailTemplate) -> str:
         """Create ElevenLabs webhook tool for this template."""
-        webhook_url = f"{self.webhook_base_url}/webhook/email/{template.template_id}"
+        webhook_url = f"{self.webhook_base_url}/webhooks/email/{template.template_id}"
         
         # Build parameters for the tool
         # Always include conversation_id as dynamic variable
