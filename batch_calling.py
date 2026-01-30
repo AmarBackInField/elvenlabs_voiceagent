@@ -122,9 +122,9 @@ class BatchCallingService(BaseClient):
                 "recipients": recipients
             }
             
-            # phone_number_id is required for batch calling
+            # ElevenLabs expects agent_phone_number_id for batch calling
             if phone_number_id:
-                payload["phone_number_id"] = phone_number_id
+                payload["agent_phone_number_id"] = phone_number_id
             else:
                 self.logger.error("phone_number_id is required but was not provided")
             
