@@ -205,7 +205,7 @@ app.include_router(
     tags=["Tools"]
 )
 
-# Webhooks router - /api/v1/webhook (called by ElevenLabs agents)
+# Webhooks router - /api/v1/webhooks (called by ElevenLabs agents)
 app.include_router(
     webhooks_router,
     prefix="/api/v1",

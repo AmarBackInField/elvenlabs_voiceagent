@@ -15,7 +15,7 @@ logger = logging.getLogger("elevenlabs.webhooks")
 
 
 router = APIRouter(
-    prefix="/webhook",
+    prefix="/webhooks",
     tags=["Webhooks (Agent Tools)"]
 )
 
