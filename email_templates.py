@@ -340,14 +340,15 @@ def get_email_template_service(webhook_base_url: str = None) -> EmailTemplateSer
     """Get or create the email template service singleton."""
     global _email_template_service
     
-    if _email_template_service is None:
-        from config import ElevenLabsConfig
-        config = ElevenLabsConfig()
-        
-        if webhook_base_url is None:
-            webhook_base_url = "http://localhost:8000/api/v1"
-        
+    from config import ElevenLabsConfig
+    config = ElevenLabsConfig()
+    
+    # If webhook_base_url is provided, always create/update the service with it
+    if webhook_base_url:
         _email_template_service = EmailTemplateService(config, webhook_base_url)
+    elif _email_template_service is None:
+        # Only use localhost default if no service exists and no URL provided
+        _email_template_service = EmailTemplateService(config, "http://localhost:8000/api/v1")
     
     return _email_template_service
 

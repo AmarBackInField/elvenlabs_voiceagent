@@ -667,8 +667,6 @@ class CreateEmailTemplateRequest(BaseModel):
     
     class Config:
         populate_by_name = True  # Allow both webhook_base_url and webhook_url
-    
-    class Config:
         json_schema_extra = {
             "example": {
                 "name": "confirm_appointment",
