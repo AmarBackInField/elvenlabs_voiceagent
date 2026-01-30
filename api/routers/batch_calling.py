@@ -72,6 +72,9 @@ async def submit_batch_job(
                 recipient_data["dynamic_variables"] = r.dynamic_variables
             recipients.append(recipient_data)
         
+        # Debug: log the request
+        logger.info(f"Batch calling request: agent_id={request.agent_id}, phone_number_id={request.phone_number_id}, recipients={len(recipients)}")
+        
         result = client.batch_calling.submit_job(
             call_name=request.call_name,
             agent_id=request.agent_id,

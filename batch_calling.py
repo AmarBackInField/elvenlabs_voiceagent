@@ -122,8 +122,11 @@ class BatchCallingService(BaseClient):
                 "recipients": recipients
             }
             
-            if phone_number_id is not None:
+            # phone_number_id is required for batch calling
+            if phone_number_id:
                 payload["phone_number_id"] = phone_number_id
+            else:
+                self.logger.error("phone_number_id is required but was not provided")
             
             if scheduled_time_unix is not None:
                 payload["scheduled_time_unix"] = scheduled_time_unix
@@ -135,6 +138,9 @@ class BatchCallingService(BaseClient):
                 payload["retry_count"] = retry_count
             
             payload.update(kwargs)
+            
+            # Debug: log the payload being sent
+            self.logger.info(f"Batch calling payload: {payload}")
             
             response = self._make_request(
                 method="POST",
