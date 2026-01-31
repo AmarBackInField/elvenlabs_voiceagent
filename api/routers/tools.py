@@ -29,6 +29,7 @@ class ToolParameter(BaseModel):
     type: str = Field("string", description="Parameter type (string, integer, boolean)")
     description: str = Field("", description="Parameter description")
     required: bool = Field(False, description="Whether parameter is required")
+    dynamic_variable: Optional[str] = Field(None, description="System variable to auto-fill (e.g., system__conversation_id)")
 
 
 class CreateWebhookToolRequest(BaseModel):

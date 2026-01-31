@@ -309,14 +309,14 @@ class ToolsService(BaseClient):
         products_tool = self.create_webhook_tool(
             name="get_products",
             description="Fetch products from the ecommerce store. Use this when the user asks about products, inventory, catalog, what items are available, or pricing information.",
-            webhook_url=f"{base_url}/webhook/ecommerce/products",
+            webhook_url=f"{base_url}/webhooks/ecommerce/products",
             parameters=common_params
         )
         
         orders_tool = self.create_webhook_tool(
             name="get_orders",
             description="Fetch recent orders from the ecommerce store. Use this when the user asks about their orders, order status, order history, or shipment tracking.",
-            webhook_url=f"{base_url}/webhook/ecommerce/orders",
+            webhook_url=f"{base_url}/webhooks/ecommerce/orders",
             parameters=common_params
         )
         
