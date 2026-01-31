@@ -212,6 +212,14 @@ app.include_router(
     tags=["Webhooks"]
 )
 
+# Webhook alias router - /api/v1/webhook (singular, for backward compatibility)
+from api.routers.webhook_alias import router as webhook_alias_router
+app.include_router(
+    webhook_alias_router,
+    prefix="/api/v1",
+    tags=["Webhooks"]
+)
+
 # Email Templates router - /api/v1/email-templates
 from api.routers.email_templates import router as email_templates_router
 app.include_router(
