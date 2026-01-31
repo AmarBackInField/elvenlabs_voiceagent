@@ -113,7 +113,11 @@ class EcommerceClient:
     
     def _get_woocommerce_products(self, limit: int) -> Dict[str, Any]:
         """Fetch products from WooCommerce."""
-        url = f"{self.base_url}/wp-json/wc/v3/products"
+        # Handle both formats: base store URL or full API URL
+        if "/wp-json/wc/v3" in self.base_url:
+            url = f"{self.base_url}/products"
+        else:
+            url = f"{self.base_url}/wp-json/wc/v3/products"
         params = {"per_page": limit}
         auth = HTTPBasicAuth(self.api_key, self.api_secret or "")
         
@@ -145,7 +149,11 @@ class EcommerceClient:
     
     def _get_woocommerce_orders(self, limit: int) -> Dict[str, Any]:
         """Fetch orders from WooCommerce."""
-        url = f"{self.base_url}/wp-json/wc/v3/orders"
+        # Handle both formats: base store URL or full API URL
+        if "/wp-json/wc/v3" in self.base_url:
+            url = f"{self.base_url}/orders"
+        else:
+            url = f"{self.base_url}/wp-json/wc/v3/orders"
         params = {"per_page": limit}
         auth = HTTPBasicAuth(self.api_key, self.api_secret or "")
         
