@@ -334,3 +334,284 @@ def _get_suggested_action(outcome: str) -> str:
         "unknown": "manual_review"
     }
     return actions.get(outcome, "manual_review")
+
+
+class AppointmentExtraction(BaseModel):
+    """Extracted appointment details from conversation."""
+    wants_appointment: bool = Field(..., description="Whether user wants to book an appointment")
+    appointment_date: Optional[str] = Field(None, description="Appointment date (YYYY-MM-DD format)")
+    appointment_time: Optional[str] = Field(None, description="Appointment time (HH:MM format, 24hr)")
+    purpose: Optional[str] = Field(None, description="Purpose/reason for appointment")
+    customer_name: Optional[str] = Field(None, description="Customer name if mentioned")
+    additional_notes: Optional[str] = Field(None, description="Any other relevant notes")
+    confidence: float = Field(0.0, description="Confidence score 0-1")
+
+
+class ExtractDataRequest(BaseModel):
+    """Request for extracting data from conversation."""
+    conversation_id: str = Field(..., description="Conversation ID to analyze")
+    extraction_type: str = Field("appointment", description="Type of extraction: appointment, lead, support")
+    openai_api_key: Optional[str] = Field(None, description="OpenAI API key (uses env var if not provided)")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "conversation_id": "conv_xxx",
+                "extraction_type": "appointment"
+            }
+        }
+
+
+@router.post(
+    "/extract-data",
+    summary="Extract Structured Data from Conversation",
+    description="Use LLM to extract appointment details, lead info, or other structured data from transcript"
+)
+async def extract_conversation_data(request: ExtractDataRequest):
+    """
+    Extract structured data from a conversation transcript using LLM.
+    
+    For appointment extraction, returns:
+    - wants_appointment: true/false
+    - appointment_date: YYYY-MM-DD
+    - appointment_time: HH:MM (24hr)
+    - purpose: reason for appointment
+    - customer_name: if mentioned
+    - additional_notes: other details
+    
+    Requires OPENAI_API_KEY environment variable or passed in request.
+    """
+    import os
+    import json
+    
+    try:
+        client = get_elevenlabs_client()
+        conv = client.conversations.get_conversation(request.conversation_id)
+        
+        transcript = conv.get("transcript", [])
+        
+        # Build transcript text
+        transcript_text = "\n".join([
+            f"{t.get('role', 'unknown').upper()}: {t.get('message') or t.get('original_message', '')}"
+            for t in transcript
+        ])
+        
+        if not transcript_text.strip():
+            return {
+                "conversation_id": request.conversation_id,
+                "extraction_type": request.extraction_type,
+                "error": "Empty transcript",
+                "extracted_data": None
+            }
+        
+        # Get OpenAI API key
+        api_key = request.openai_api_key or os.getenv("OPENAI_API_KEY")
+        
+        if not api_key:
+            # Fallback to rule-based extraction
+            return await _extract_appointment_rules(request.conversation_id, transcript_text, transcript)
+        
+        # Use OpenAI for extraction
+        extraction_prompt = _get_extraction_prompt(request.extraction_type, transcript_text)
+        
+        async with httpx.AsyncClient(timeout=30.0) as http_client:
+            response = await http_client.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "gpt-4o-mini",
+                    "messages": [
+                        {"role": "system", "content": "You are a data extraction assistant. Extract structured data from conversation transcripts. Return valid JSON only."},
+                        {"role": "user", "content": extraction_prompt}
+                    ],
+                    "temperature": 0,
+                    "response_format": {"type": "json_object"}
+                }
+            )
+            
+            if response.status_code != 200:
+                logger.error(f"OpenAI API error: {response.text}")
+                # Fallback to rules
+                return await _extract_appointment_rules(request.conversation_id, transcript_text, transcript)
+            
+            result = response.json()
+            extracted_json = result["choices"][0]["message"]["content"]
+            extracted_data = json.loads(extracted_json)
+            
+            return {
+                "conversation_id": request.conversation_id,
+                "extraction_type": request.extraction_type,
+                "extracted_data": extracted_data,
+                "transcript_turns": len(transcript),
+                "duration_seconds": conv.get("metadata", {}).get("call_duration_secs"),
+                "method": "llm"
+            }
+            
+    except Exception as e:
+        logger.error(f"Extraction error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _get_extraction_prompt(extraction_type: str, transcript: str) -> str:
+    """Get the extraction prompt based on type."""
+    
+    if extraction_type == "appointment":
+        return f"""Analyze this conversation transcript and extract appointment booking information.
+
+TRANSCRIPT:
+{transcript}
+
+Extract and return JSON with these fields:
+{{
+    "wants_appointment": true/false (did the user want to book an appointment?),
+    "appointment_date": "YYYY-MM-DD" or null (the date mentioned, convert to ISO format),
+    "appointment_time": "HH:MM" or null (the time in 24-hour format),
+    "purpose": "string" or null (why they want the appointment),
+    "customer_name": "string" or null (customer's name if mentioned),
+    "appointment_confirmed": true/false (was the appointment confirmed by the agent?),
+    "additional_notes": "string" or null (any other relevant details),
+    "confidence": 0.0-1.0 (how confident you are in this extraction)
+}}
+
+If a field cannot be determined, use null. Be precise with dates and times."""
+
+    elif extraction_type == "lead":
+        return f"""Analyze this conversation transcript and extract lead/sales information.
+
+TRANSCRIPT:
+{transcript}
+
+Extract and return JSON with these fields:
+{{
+    "is_interested": true/false,
+    "interest_level": "high/medium/low/none",
+    "customer_name": "string" or null,
+    "email": "string" or null,
+    "phone": "string" or null,
+    "product_interest": ["list of products mentioned"],
+    "objections": ["list of objections raised"],
+    "follow_up_needed": true/false,
+    "notes": "string",
+    "confidence": 0.0-1.0
+}}"""
+
+    else:  # support
+        return f"""Analyze this conversation transcript and extract support ticket information.
+
+TRANSCRIPT:
+{transcript}
+
+Extract and return JSON with these fields:
+{{
+    "issue_type": "string",
+    "issue_description": "string",
+    "issue_resolved": true/false,
+    "customer_name": "string" or null,
+    "customer_sentiment": "positive/neutral/negative",
+    "follow_up_needed": true/false,
+    "notes": "string",
+    "confidence": 0.0-1.0
+}}"""
+
+
+async def _extract_appointment_rules(conversation_id: str, transcript_text: str, transcript: list) -> dict:
+    """Fallback rule-based extraction when no LLM available."""
+    import re
+    from datetime import datetime
+    
+    text_lower = transcript_text.lower()
+    
+    # Check if wants appointment
+    wants_appointment = any(word in text_lower for word in [
+        "book", "schedule", "appointment", "meeting", "yes"
+    ])
+    
+    # Extract date patterns
+    date_match = None
+    date_patterns = [
+        r'(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?(\w+)(?:\s*,?\s*(\d{4}))?',  # 2nd of February 2026
+        r'(\w+)\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s*,?\s*(\d{4}))?',  # February 2nd, 2026
+    ]
+    
+    months = {
+        'january': 1, 'february': 2, 'march': 3, 'april': 4,
+        'may': 5, 'june': 6, 'july': 7, 'august': 8,
+        'september': 9, 'october': 10, 'november': 11, 'december': 12
+    }
+    
+    for pattern in date_patterns:
+        match = re.search(pattern, text_lower)
+        if match:
+            groups = match.groups()
+            try:
+                if groups[1].lower() in months:  # First pattern
+                    day = int(groups[0])
+                    month = months[groups[1].lower()]
+                    year = int(groups[2]) if groups[2] else datetime.now().year
+                else:  # Second pattern
+                    month = months.get(groups[0].lower())
+                    day = int(groups[1])
+                    year = int(groups[2]) if groups[2] else datetime.now().year
+                if month:
+                    date_match = f"{year:04d}-{month:02d}-{day:02d}"
+            except:
+                pass
+            break
+    
+    # Extract time
+    time_match = None
+    time_patterns = [
+        r'(\d{1,2})(?::(\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)',  # 3 pm, 3:00 pm
+        r'at\s+(\d{1,2})(?::(\d{2}))?',  # at 3
+    ]
+    
+    for pattern in time_patterns:
+        match = re.search(pattern, text_lower)
+        if match:
+            groups = match.groups()
+            try:
+                hour = int(groups[0])
+                minute = int(groups[1]) if groups[1] else 0
+                if len(groups) > 2 and groups[2] and 'p' in groups[2].lower() and hour < 12:
+                    hour += 12
+                time_match = f"{hour:02d}:{minute:02d}"
+            except:
+                pass
+            break
+    
+    # Extract purpose
+    purpose = None
+    purpose_keywords = ["purpose", "reason", "for", "about", "discuss", "query", "question"]
+    for turn in reversed(transcript):
+        msg = (turn.get("message") or turn.get("original_message", "")).lower()
+        if turn.get("role") == "user" and any(kw in msg for kw in purpose_keywords):
+            purpose = turn.get("message") or turn.get("original_message")
+            break
+    
+    if not purpose:
+        # Look for user message after agent asks about purpose
+        for i, turn in enumerate(transcript):
+            if turn.get("role") == "agent" and "purpose" in (turn.get("message") or "").lower():
+                if i + 1 < len(transcript) and transcript[i + 1].get("role") == "user":
+                    purpose = transcript[i + 1].get("message") or transcript[i + 1].get("original_message")
+                    break
+    
+    return {
+        "conversation_id": conversation_id,
+        "extraction_type": "appointment",
+        "extracted_data": {
+            "wants_appointment": wants_appointment,
+            "appointment_date": date_match,
+            "appointment_time": time_match,
+            "purpose": purpose,
+            "customer_name": None,
+            "appointment_confirmed": "confirmed" in text_lower or "scheduled" in text_lower,
+            "additional_notes": None,
+            "confidence": 0.6 if wants_appointment else 0.4
+        },
+        "transcript_turns": len(transcript),
+        "method": "rules"
+    }
