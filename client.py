@@ -181,3 +181,20 @@ class ElevenLabsClient:
         Delegates to batch_calling.submit_job()
         """
         return self.batch_calling.submit_job(**kwargs)
+
+
+# Singleton instance for convenience
+_client_instance: Optional[ElevenLabsClient] = None
+
+
+def get_elevenlabs_client() -> ElevenLabsClient:
+    """
+    Get a singleton instance of ElevenLabsClient.
+    
+    Creates the client on first call and reuses it for subsequent calls.
+    Useful for background tasks and automation endpoints.
+    """
+    global _client_instance
+    if _client_instance is None:
+        _client_instance = ElevenLabsClient()
+    return _client_instance
