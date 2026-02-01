@@ -228,6 +228,14 @@ app.include_router(
     tags=["Email Templates"]
 )
 
+# Automation router - /api/v1/automation
+from api.routers.automation import router as automation_router
+app.include_router(
+    automation_router,
+    prefix="/api/v1",
+    tags=["Automation"]
+)
+
 
 # =============================================================================
 # Root Endpoints

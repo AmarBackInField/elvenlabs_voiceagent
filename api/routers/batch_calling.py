@@ -253,3 +253,83 @@ async def cancel_batch_job(
         raise HTTPException(status_code=404, detail=str(e))
     except ElevenLabsError as e:
         raise HTTPException(status_code=e.status_code or 500, detail=str(e))
+
+
+@router.get(
+    "/{job_id}/results",
+    summary="Get Batch Job Results with Transcripts",
+    description="Get detailed results including conversation transcripts for automation"
+)
+async def get_batch_job_results(
+    job_id: str,
+    include_transcript: bool = Query(True, description="Include conversation transcripts"),
+    client: ElevenLabsClient = Depends(get_client)
+):
+    """
+    Get batch job results with conversation details for automation.
+    
+    Returns structured data for each recipient including:
+    - Call status (completed, failed, voicemail, etc.)
+    - Conversation transcript
+    - Dynamic variables used
+    - Duration
+    
+    Use this endpoint to:
+    1. Process completed calls
+    2. Trigger follow-up actions based on outcomes
+    3. Update your CRM/database with results
+    """
+    try:
+        # Get batch job details
+        job = client.batch_calling.get_job(job_id)
+        recipients = job.get("recipients", [])
+        
+        results = []
+        for recipient in recipients:
+            result = {
+                "recipient_id": recipient.get("id"),
+                "phone_number": recipient.get("phone_number"),
+                "status": recipient.get("status"),
+                "conversation_id": recipient.get("conversation_id"),
+                "dynamic_variables": recipient.get("conversation_initiation_client_data", {}).get("dynamic_variables", {}),
+                "transcript": None,
+                "duration_seconds": None,
+                "call_successful": recipient.get("status") == "completed"
+            }
+            
+            # Fetch conversation details if requested and conversation exists
+            if include_transcript and recipient.get("conversation_id"):
+                try:
+                    conv = client.conversations.get_conversation(recipient["conversation_id"])
+                    
+                    # Extract transcript
+                    transcript_messages = []
+                    for turn in conv.get("transcript", []):
+                        transcript_messages.append({
+                            "role": turn.get("role"),
+                            "message": turn.get("message") or turn.get("original_message", "")
+                        })
+                    
+                    result["transcript"] = transcript_messages
+                    result["duration_seconds"] = conv.get("metadata", {}).get("call_duration_secs")
+                    result["end_reason"] = conv.get("metadata", {}).get("termination_reason")
+                    
+                except Exception as e:
+                    logger.warning(f"Could not fetch conversation {recipient.get('conversation_id')}: {e}")
+            
+            results.append(result)
+        
+        return {
+            "job_id": job_id,
+            "job_name": job.get("name"),
+            "status": job.get("status"),
+            "total_recipients": len(recipients),
+            "completed": sum(1 for r in results if r["call_successful"]),
+            "failed": sum(1 for r in results if not r["call_successful"]),
+            "results": results
+        }
+        
+    except NotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ElevenLabsError as e:
+        raise HTTPException(status_code=e.status_code or 500, detail=str(e))
