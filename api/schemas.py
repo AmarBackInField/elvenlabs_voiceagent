@@ -207,7 +207,12 @@ class ImportPhoneNumberResponse(BaseModel):
 
 
 class UpdatePhoneNumberRequest(BaseModel):
-    """Request for updating a phone number."""
+    """
+    Request for updating a phone number configuration.
+    
+    Note: phone_number and provider cannot be changed after creation.
+    To change those, delete and re-import the number.
+    """
     agent_id: Optional[str] = Field(None, description="Agent ID to assign to this number (null to unassign)")
     label: Optional[str] = Field(None, description="Display label for the phone number")
     supports_inbound: Optional[bool] = Field(None, description="Whether this number supports inbound calls")
@@ -220,11 +225,26 @@ class UpdatePhoneNumberRequest(BaseModel):
         json_schema_extra = {
             "example": {
                 "agent_id": "agent_abc123",
-                "label": "Updated Label",
+                "label": "Italy SIP Line",
                 "supports_inbound": True,
+                "supports_outbound": True,
                 "inbound_trunk_config": {
                     "address": "sip.rtc.elevenlabs.io:5060",
-                    "media_encryption": "allowed"
+                    "media_encryption": "allowed",
+                    "transport": "auto",
+                    "credentials": {
+                        "username": "+390620199287",
+                        "password": "your_password"
+                    }
+                },
+                "outbound_trunk_config": {
+                    "address": "voiceagent.fibrapro.it",
+                    "media_encryption": "allowed",
+                    "transport": "auto",
+                    "credentials": {
+                        "username": "+390620199287",
+                        "password": "your_password"
+                    }
                 }
             }
         }
