@@ -60,7 +60,7 @@ async def submit_batch_job(
     - Payment reminders
     """
     try:
-        # Convert recipients to dict format (exclude email as ElevenLabs doesn't need it)
+        # Convert recipients to dict format with conversation_initiation_client_data
         recipients = []
         for r in request.recipients:
             recipient_data = {
@@ -68,8 +68,11 @@ async def submit_batch_job(
             }
             if r.name:
                 recipient_data["name"] = r.name
+            # Dynamic variables must be inside conversation_initiation_client_data
             if r.dynamic_variables:
-                recipient_data["dynamic_variables"] = r.dynamic_variables
+                recipient_data["conversation_initiation_client_data"] = {
+                    "dynamic_variables": r.dynamic_variables
+                }
             recipients.append(recipient_data)
         
         # Debug: log the request
