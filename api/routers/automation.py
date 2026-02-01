@@ -129,6 +129,140 @@ async def delete_subscription(subscription_id: str):
     return AutomationResponse(success=True, message="Subscription deleted")
 
 
+@router.get(
+    "/batch/{job_id}/wait-and-get-results",
+    summary="Wait for Batch Completion & Get Results",
+    description="Automatically polls until batch job completes, then returns full results with transcripts"
+)
+async def wait_and_get_batch_results(
+    job_id: str,
+    include_transcript: bool = True,
+    extract_appointments: bool = True,
+    max_wait_seconds: int = 300,
+    poll_interval: int = 5
+):
+    """
+    Automatically wait for a batch job to complete and return full results.
+    
+    This endpoint:
+    1. Polls the batch job status every {poll_interval} seconds
+    2. Waits until status == "completed" (or max_wait_seconds reached)
+    3. Fetches all conversation transcripts
+    4. Optionally extracts appointment data from each conversation
+    
+    Parameters:
+    - job_id: The batch job ID
+    - include_transcript: Include full conversation transcripts
+    - extract_appointments: Run LLM/rule extraction on each conversation
+    - max_wait_seconds: Maximum time to wait (default 5 minutes)
+    - poll_interval: Seconds between status checks (default 5)
+    
+    Returns complete results when batch finishes.
+    """
+    import asyncio
+    
+    client = get_elevenlabs_client()
+    elapsed = 0
+    
+    # Poll until completed or timeout
+    while elapsed < max_wait_seconds:
+        try:
+            job = client.batch_calling.get_job(job_id)
+            status = job.get("status")
+            
+            if status == "completed":
+                break
+            elif status in ["failed", "cancelled"]:
+                return {
+                    "job_id": job_id,
+                    "status": status,
+                    "error": f"Batch job {status}",
+                    "results": []
+                }
+            
+            # Still in progress, wait and poll again
+            await asyncio.sleep(poll_interval)
+            elapsed += poll_interval
+            
+        except Exception as e:
+            logger.error(f"Error polling batch job: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    if elapsed >= max_wait_seconds:
+        return {
+            "job_id": job_id,
+            "status": "timeout",
+            "error": f"Batch job did not complete within {max_wait_seconds} seconds",
+            "elapsed_seconds": elapsed,
+            "results": []
+        }
+    
+    # Job completed - fetch full results
+    try:
+        job = client.batch_calling.get_job(job_id)
+        recipients = job.get("recipients", [])
+        
+        results = []
+        for recipient in recipients:
+            result = {
+                "recipient_id": recipient.get("id"),
+                "phone_number": recipient.get("phone_number"),
+                "status": recipient.get("status"),
+                "conversation_id": recipient.get("conversation_id"),
+                "dynamic_variables": recipient.get("conversation_initiation_client_data", {}).get("dynamic_variables", {}),
+                "transcript": None,
+                "duration_seconds": None,
+                "extracted_data": None
+            }
+            
+            conv_id = recipient.get("conversation_id")
+            
+            # Fetch conversation details
+            if conv_id and recipient.get("status") == "completed":
+                try:
+                    conv = client.conversations.get_conversation(conv_id)
+                    
+                    # Build transcript
+                    if include_transcript:
+                        transcript_messages = []
+                        for turn in conv.get("transcript", []):
+                            transcript_messages.append({
+                                "role": turn.get("role"),
+                                "message": turn.get("message") or turn.get("original_message", "")
+                            })
+                        result["transcript"] = transcript_messages
+                    
+                    result["duration_seconds"] = conv.get("metadata", {}).get("call_duration_secs")
+                    
+                    # Extract appointment data
+                    if extract_appointments:
+                        transcript_text = "\n".join([
+                            f"{t.get('role', 'unknown').upper()}: {t.get('message') or t.get('original_message', '')}"
+                            for t in conv.get("transcript", [])
+                        ])
+                        extraction = await _extract_appointment_rules(conv_id, transcript_text, conv.get("transcript", []))
+                        result["extracted_data"] = extraction.get("extracted_data")
+                    
+                except Exception as e:
+                    logger.warning(f"Could not fetch conversation {conv_id}: {e}")
+            
+            results.append(result)
+        
+        return {
+            "job_id": job_id,
+            "job_name": job.get("name"),
+            "status": "completed",
+            "total_recipients": len(recipients),
+            "completed_calls": sum(1 for r in results if r["status"] == "completed"),
+            "failed_calls": sum(1 for r in results if r["status"] != "completed"),
+            "results": results
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching batch results: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post(
     "/process-batch",
     response_model=AutomationResponse,
