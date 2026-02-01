@@ -195,7 +195,7 @@ async def get_phone_number(
     "/{phone_number_id}",
     response_model=PhoneNumberResponse,
     summary="Update Phone Number",
-    description="Update phone number configuration (e.g., assign agent)",
+    description="Update phone number configuration (e.g., assign agent, update SIP trunk settings)",
     responses={404: {"model": ErrorResponse, "description": "Phone number not found"}}
 )
 async def update_phone_number(
@@ -206,10 +206,61 @@ async def update_phone_number(
     """
     Update a phone number's configuration.
     
-    Common use case: Assign an agent to handle incoming calls on this number.
+    Updatable fields:
+    - agent_id: Assign/unassign an agent to handle calls
+    - label: Update the display name
+    - supports_inbound: Enable/disable inbound calls
+    - supports_outbound: Enable/disable outbound calls
+    - inbound_trunk_config: Update SIP trunk inbound settings (address, media_encryption, credentials)
+    - outbound_trunk_config: Update SIP trunk outbound settings
     """
     try:
-        update_data = request.model_dump(exclude_none=True)
+        # Build update payload
+        update_data = {}
+        
+        # Simple fields
+        if request.agent_id is not None:
+            update_data["agent_id"] = request.agent_id
+        if request.label is not None:
+            update_data["label"] = request.label
+        if request.supports_inbound is not None:
+            update_data["supports_inbound"] = request.supports_inbound
+        if request.supports_outbound is not None:
+            update_data["supports_outbound"] = request.supports_outbound
+        
+        # Handle inbound trunk config
+        if request.inbound_trunk_config:
+            inbound_config = {"address": request.inbound_trunk_config.address}
+            if request.inbound_trunk_config.credentials:
+                creds = {"username": request.inbound_trunk_config.credentials.username}
+                if request.inbound_trunk_config.credentials.password:
+                    creds["password"] = request.inbound_trunk_config.credentials.password
+                inbound_config["credentials"] = creds
+            if request.inbound_trunk_config.transport:
+                inbound_config["transport"] = request.inbound_trunk_config.transport
+            if request.inbound_trunk_config.media_encryption:
+                inbound_config["media_encryption"] = request.inbound_trunk_config.media_encryption
+            if request.inbound_trunk_config.headers:
+                inbound_config["headers"] = request.inbound_trunk_config.headers
+            update_data["inbound_trunk_config"] = inbound_config
+        
+        # Handle outbound trunk config
+        if request.outbound_trunk_config:
+            outbound_config = {"address": request.outbound_trunk_config.address}
+            if request.outbound_trunk_config.credentials:
+                creds = {"username": request.outbound_trunk_config.credentials.username}
+                if request.outbound_trunk_config.credentials.password:
+                    creds["password"] = request.outbound_trunk_config.credentials.password
+                outbound_config["credentials"] = creds
+            if request.outbound_trunk_config.transport:
+                outbound_config["transport"] = request.outbound_trunk_config.transport
+            if request.outbound_trunk_config.media_encryption:
+                outbound_config["media_encryption"] = request.outbound_trunk_config.media_encryption
+            if request.outbound_trunk_config.headers:
+                outbound_config["headers"] = request.outbound_trunk_config.headers
+            update_data["outbound_trunk_config"] = outbound_config
+        
+        logger.info(f"Updating phone number {phone_number_id} with: {list(update_data.keys())}")
         result = client.phone_numbers.update_phone_number(phone_number_id, **update_data)
         return PhoneNumberResponse(**result)
     except NotFoundError as e:

@@ -208,11 +208,26 @@ class ImportPhoneNumberResponse(BaseModel):
 
 class UpdatePhoneNumberRequest(BaseModel):
     """Request for updating a phone number."""
-    agent_id: Optional[str] = None
-    label: Optional[str] = None
+    agent_id: Optional[str] = Field(None, description="Agent ID to assign to this number (null to unassign)")
+    label: Optional[str] = Field(None, description="Display label for the phone number")
+    supports_inbound: Optional[bool] = Field(None, description="Whether this number supports inbound calls")
+    supports_outbound: Optional[bool] = Field(None, description="Whether this number supports outbound calls")
+    inbound_trunk_config: Optional[SIPTrunkConfig] = Field(None, description="Update inbound SIP trunk configuration")
+    outbound_trunk_config: Optional[SIPTrunkConfig] = Field(None, description="Update outbound SIP trunk configuration")
     
     class Config:
         extra = "allow"
+        json_schema_extra = {
+            "example": {
+                "agent_id": "agent_abc123",
+                "label": "Updated Label",
+                "supports_inbound": True,
+                "inbound_trunk_config": {
+                    "address": "sip.rtc.elevenlabs.io:5060",
+                    "media_encryption": "allowed"
+                }
+            }
+        }
 
 
 class PhoneNumberResponse(BaseModel):
@@ -221,6 +236,12 @@ class PhoneNumberResponse(BaseModel):
     phone_number: Optional[str] = None
     label: Optional[str] = None
     agent_id: Optional[str] = None
+    supports_inbound: Optional[bool] = None
+    supports_outbound: Optional[bool] = None
+    provider: Optional[str] = None
+    assigned_agent: Optional[Dict[str, Any]] = None
+    inbound_trunk_config: Optional[Dict[str, Any]] = None
+    outbound_trunk_config: Optional[Dict[str, Any]] = None
     
     class Config:
         extra = "allow"
