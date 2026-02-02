@@ -287,7 +287,14 @@ async def email_webhook(template_id: str, request: Request):
         
         # Extract agent_id and phone number for batch job lookup
         agent_id = body.get("agent_id") or body.get("agentId")
-        to_phone = body.get("to_number") or body.get("phone_number") or body.get("recipient_phone")
+        to_phone = (
+            body.get("called_number") or  # From system__called_number dynamic variable
+            body.get("to_number") or 
+            body.get("phone_number") or 
+            body.get("recipient_phone")
+        )
+        
+        logger.info(f"Email webhook lookup: conversation_id={conversation_id}, agent_id={agent_id}, to_phone={to_phone}")
         
         # Try to get customer info from session store first
         customer_info = None

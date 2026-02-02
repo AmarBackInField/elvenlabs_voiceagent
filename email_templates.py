@@ -206,7 +206,7 @@ class EmailTemplateService:
         webhook_url = f"{self.webhook_base_url}/webhooks/email/{template.template_id}"
         
         # Build parameters for the tool
-        # Always include conversation_id as dynamic variable
+        # Include system dynamic variables for recipient lookup
         tool_parameters = [
             {
                 "name": "conversation_id",
@@ -214,6 +214,20 @@ class EmailTemplateService:
                 "description": "Conversation ID",
                 "required": True,
                 "dynamic_variable": "system__conversation_id"
+            },
+            {
+                "name": "agent_id",
+                "type": "string",
+                "description": "Agent ID",
+                "required": True,
+                "dynamic_variable": "system__agent_id"
+            },
+            {
+                "name": "called_number",
+                "type": "string",
+                "description": "Recipient phone number",
+                "required": True,
+                "dynamic_variable": "system__called_number"
             }
         ]
         
