@@ -1,0 +1,16 @@
+{
+  "webhook_base_url": "https://elvenlabs-voiceagent.onrender.com/api/v1",
+  "templates": [
+    {
+      "name": "booking_appointment",
+      "tool_id": "tool_1501kgfqkmg0e9ws42dry4d87hha",
+      "description": "Use this tool when a customer confirms or books an appointment. Send them a confirmation email with the appointment details.",
+      "subject_template": "Your Appointment is Confirmed - {{date}} at {{time}}",
+      "body_template": "Dear {{customer_name}},\n\nThank you for booking an appointment with us!\n\nHere are your appointment details:\n\n📅 Date: {{date}}\n⏰ Time: {{time}}\n📧 Email: {{customer_email}}\n\nPlease make sure to arrive 10 minutes before your scheduled time.\n\nIf you need to reschedule or cancel, please contact us.\n\nBest regards,\nAistein Team",
+      "parameters": [
+        {"name": "date", "description": "The date of the appointment", "required": true},
+        {"name": "time", "description": "The time of the appointment", "required": true}
+      ]
+    }
+  ]
+}

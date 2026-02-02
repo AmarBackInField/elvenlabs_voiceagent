@@ -1,13 +1,19 @@
 """
 Email Template Service.
 Manages email templates and creates corresponding ElevenLabs webhook tools.
+
+Templates are stored in memory but can be auto-loaded from a config file
+(email_templates_config.json) on startup to persist across server restarts.
 """
 
 import uuid
 import re
+import json
+import os
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
+from pathlib import Path
 import logging
 import requests
 
@@ -16,6 +22,9 @@ from tools import ToolsService
 
 
 logger = logging.getLogger(__name__)
+
+# Path to the config file
+CONFIG_FILE_PATH = Path(__file__).parent / "email_templates_config.json"
 
 
 @dataclass
@@ -348,11 +357,86 @@ class EmailTemplateService:
 # Global instances
 customer_sessions = CustomerSessionStore()
 _email_template_service: Optional[EmailTemplateService] = None
+_templates_loaded = False
+
+
+def load_templates_from_config(service: EmailTemplateService) -> int:
+    """
+    Load templates from the config file.
+    
+    If a template has a tool_id, it will use that existing tool.
+    If no tool_id, it will create a new tool in ElevenLabs.
+    
+    Returns:
+        Number of templates loaded
+    """
+    if not CONFIG_FILE_PATH.exists():
+        logger.info(f"No config file found at {CONFIG_FILE_PATH}")
+        return 0
+    
+    try:
+        with open(CONFIG_FILE_PATH, 'r') as f:
+            config_data = json.load(f)
+        
+        templates = config_data.get("templates", [])
+        loaded_count = 0
+        
+        for template_config in templates:
+            template_id = template_config["name"].lower().replace(" ", "_").replace("-", "_")
+            
+            # Skip if already loaded
+            if service.get_template(template_id):
+                logger.info(f"Template {template_id} already exists, skipping")
+                continue
+            
+            # Check if tool_id is provided (use existing tool)
+            existing_tool_id = template_config.get("tool_id")
+            
+            if existing_tool_id:
+                # Load template with existing tool_id (don't create new tool)
+                logger.info(f"Loading template {template_id} with existing tool_id: {existing_tool_id}")
+                
+                param_objects = [
+                    EmailTemplateParameter(**p) 
+                    for p in template_config.get("parameters", [])
+                ]
+                
+                template = EmailTemplate(
+                    template_id=template_id,
+                    name=template_config["name"],
+                    description=template_config["description"],
+                    subject_template=template_config["subject_template"],
+                    body_template=template_config["body_template"],
+                    parameters=param_objects,
+                    tool_id=existing_tool_id
+                )
+                
+                service._templates[template_id] = template
+                loaded_count += 1
+            else:
+                # Create new template with new tool
+                logger.info(f"Creating template {template_id} with new tool")
+                service.create_template(
+                    name=template_config["name"],
+                    description=template_config["description"],
+                    subject_template=template_config["subject_template"],
+                    body_template=template_config["body_template"],
+                    parameters=template_config.get("parameters"),
+                    auto_create_tool=True
+                )
+                loaded_count += 1
+        
+        logger.info(f"Loaded {loaded_count} templates from config")
+        return loaded_count
+        
+    except Exception as e:
+        logger.error(f"Error loading templates from config: {e}")
+        return 0
 
 
 def get_email_template_service(webhook_base_url: str = None) -> EmailTemplateService:
     """Get or create the email template service singleton."""
-    global _email_template_service
+    global _email_template_service, _templates_loaded
     
     from config import ElevenLabsConfig
     config = ElevenLabsConfig()
@@ -360,17 +444,39 @@ def get_email_template_service(webhook_base_url: str = None) -> EmailTemplateSer
     # If webhook_base_url is provided, always create/update the service with it
     if webhook_base_url:
         _email_template_service = EmailTemplateService(config, webhook_base_url)
+        # Load templates from config
+        if not _templates_loaded:
+            load_templates_from_config(_email_template_service)
+            _templates_loaded = True
     elif _email_template_service is None:
-        # Only use localhost default if no service exists and no URL provided
-        _email_template_service = EmailTemplateService(config, "http://localhost:8000/api/v1")
+        # Try to get webhook_base_url from config file
+        default_url = "http://localhost:8000/api/v1"
+        if CONFIG_FILE_PATH.exists():
+            try:
+                with open(CONFIG_FILE_PATH, 'r') as f:
+                    config_data = json.load(f)
+                    default_url = config_data.get("webhook_base_url", default_url)
+            except Exception:
+                pass
+        
+        _email_template_service = EmailTemplateService(config, default_url)
+        # Load templates from config
+        if not _templates_loaded:
+            load_templates_from_config(_email_template_service)
+            _templates_loaded = True
     
     return _email_template_service
 
 
 def set_webhook_base_url(webhook_base_url: str) -> None:
     """Set the webhook base URL for the service."""
-    global _email_template_service
+    global _email_template_service, _templates_loaded
     
     from config import ElevenLabsConfig
     config = ElevenLabsConfig()
     _email_template_service = EmailTemplateService(config, webhook_base_url)
+    
+    # Load templates from config
+    if not _templates_loaded:
+        load_templates_from_config(_email_template_service)
+        _templates_loaded = True
