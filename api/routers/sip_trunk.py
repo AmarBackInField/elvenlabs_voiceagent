@@ -45,10 +45,15 @@ async def outbound_call(
     The agent will call the specified number and start a conversation.
     You can inject dynamic variables that will be available in the conversation.
     
+    Features:
+    - Include ecommerce_credentials to enable product/order lookups during the call
+    - Include customer_info to enable email templates during the call
+    - Include sender_email for the business/sender email header
+    
     Example use cases:
-    - Appointment reminders
-    - Customer outreach
-    - Follow-up calls
+    - Appointment reminders with email confirmation
+    - Customer outreach with product info
+    - Follow-up calls with order status
     """
     try:
         result = client.sip_trunk.outbound_call(
@@ -61,6 +66,21 @@ async def outbound_call(
         )
         
         conversation_id = result.get("conversation_id")
+        ecommerce_enabled = False
+        
+        # Store ecommerce credentials for webhook lookups if provided
+        if request.ecommerce_credentials and conversation_id:
+            from ecommerce import get_ecommerce_service
+            ecommerce_service = get_ecommerce_service()
+            ecommerce_service.create_client(
+                session_id=conversation_id,
+                platform=request.ecommerce_credentials.platform,
+                base_url=request.ecommerce_credentials.base_url,
+                api_key=request.ecommerce_credentials.api_key,
+                api_secret=request.ecommerce_credentials.api_secret,
+                access_token=request.ecommerce_credentials.access_token
+            )
+            ecommerce_enabled = True
         
         # Store customer info for email tools if provided
         if request.customer_info and conversation_id:

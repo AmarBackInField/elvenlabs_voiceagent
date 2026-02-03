@@ -311,6 +311,10 @@ class OutboundCallRequest(BaseModel):
         None, 
         description="Override default first message"
     )
+    ecommerce_credentials: Optional[EcommerceCredentials] = Field(
+        None,
+        description="Ecommerce platform credentials for product/order lookups during call"
+    )
     customer_info: Optional[CustomerInfoForCall] = Field(
         None,
         description="Customer info for email tools (name, email of the recipient)"
@@ -329,6 +333,12 @@ class OutboundCallRequest(BaseModel):
                 "dynamic_variables": {
                     "customer_name": "John Doe",
                     "order_id": "ORD-12345"
+                },
+                "ecommerce_credentials": {
+                    "platform": "woocommerce",
+                    "base_url": "https://mystore.com",
+                    "api_key": "ck_xxxxx",
+                    "api_secret": "cs_xxxxx"
                 },
                 "customer_info": {
                     "name": "John Doe",
