@@ -294,6 +294,25 @@ class EmailSenderConfig(BaseModel):
         extra = "allow"
 
 
+class EcommerceCredentials(BaseModel):
+    """Ecommerce platform credentials for call context."""
+    platform: str = Field(..., description="Platform name: woocommerce, shopify")
+    base_url: str = Field(..., description="Store base URL")
+    api_key: str = Field(..., description="API key / Consumer key")
+    api_secret: Optional[str] = Field(None, description="API secret (for WooCommerce)")
+    access_token: Optional[str] = Field(None, description="Access token (for Shopify)")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "platform": "woocommerce",
+                "base_url": "https://mystore.com",
+                "api_key": "ck_xxxxx",
+                "api_secret": "cs_xxxxx"
+            }
+        }
+
+
 class OutboundCallRequest(BaseModel):
     """Request schema for outbound call via SIP trunk."""
     agent_id: str = Field(..., description="Agent ID to handle the call")
@@ -355,25 +374,6 @@ class OutboundCallResponse(BaseModel):
     message: Optional[str] = None
     conversation_id: Optional[str] = None
     sip_call_id: Optional[str] = None
-
-
-class EcommerceCredentials(BaseModel):
-    """Ecommerce platform credentials for call context."""
-    platform: str = Field(..., description="Platform name: woocommerce, shopify")
-    base_url: str = Field(..., description="Store base URL")
-    api_key: str = Field(..., description="API key / Consumer key")
-    api_secret: Optional[str] = Field(None, description="API secret (for WooCommerce)")
-    access_token: Optional[str] = Field(None, description="Access token (for Shopify)")
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "platform": "woocommerce",
-                "base_url": "https://mystore.com",
-                "api_key": "ck_xxxxx",
-                "api_secret": "cs_xxxxx"
-            }
-        }
 
 
 class TwilioOutboundCallRequest(BaseModel):
