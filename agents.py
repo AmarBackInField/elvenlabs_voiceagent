@@ -96,6 +96,9 @@ class AgentService(BaseClient):
             # If full config provided, use it directly
             if conversation_config is not None:
                 payload = {"conversation_config": conversation_config}
+                # Always add name if provided, even with conversation_config
+                if name:
+                    payload["name"] = name
             else:
                 # Build config from helper parameters
                 agent_config = {

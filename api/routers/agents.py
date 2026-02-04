@@ -74,6 +74,7 @@ async def create_agent(
         # If full config provided, use it
         if request.conversation_config:
             result = client.agents.create_agent(
+                name=request.name,  # Always pass name if provided
                 conversation_config=request.conversation_config.model_dump(exclude_none=True)
             )
         else:
