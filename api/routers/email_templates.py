@@ -49,7 +49,8 @@ def _template_to_response(template: EmailTemplate) -> EmailTemplateResponse:
             ) for p in template.parameters
         ],
         tool_id=template.tool_id,
-        created_at=template.created_at
+        created_at=template.created_at,
+        sender_email=template.sender_email
     )
 
 
@@ -88,7 +89,8 @@ async def create_email_template(request: CreateEmailTemplateRequest):
             subject_template=request.subject_template,
             body_template=request.body_template,
             parameters=params,
-            auto_create_tool=True
+            auto_create_tool=True,
+            sender_email=request.sender_email
         )
         
         return _template_to_response(template)

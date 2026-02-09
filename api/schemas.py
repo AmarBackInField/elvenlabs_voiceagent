@@ -715,6 +715,10 @@ class CreateEmailTemplateRequest(BaseModel):
         description="Base URL for webhook (e.g., https://your-ngrok.ngrok-free.app/api/v1)",
         alias="webhook_url"
     )
+    sender_email: Optional[str] = Field(
+        None,
+        description="Default sender email for this template (used for inbound calls when sender is not passed at call time)"
+    )
     
     class Config:
         populate_by_name = True  # Allow both webhook_base_url and webhook_url
@@ -729,7 +733,8 @@ class CreateEmailTemplateRequest(BaseModel):
                     {"name": "time", "description": "Appointment time", "required": True},
                     {"name": "notes", "description": "Additional notes", "required": False}
                 ],
-                "webhook_base_url": "https://your-ngrok.ngrok-free.app/api/v1"
+                "webhook_base_url": "https://your-ngrok.ngrok-free.app/api/v1",
+                "sender_email": "support@mycompany.com"
             }
         }
 
@@ -744,6 +749,7 @@ class EmailTemplateResponse(BaseModel):
     parameters: List[EmailTemplateParameter]
     tool_id: Optional[str] = None
     created_at: str
+    sender_email: Optional[str] = None
 
 
 class EmailTemplateListResponse(BaseModel):

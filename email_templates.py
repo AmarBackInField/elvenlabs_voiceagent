@@ -46,6 +46,7 @@ class EmailTemplate:
     parameters: List[EmailTemplateParameter] = field(default_factory=list)
     tool_id: Optional[str] = None  # ElevenLabs tool ID once created
     created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    sender_email: Optional[str] = None  # Default sender for inbound (when not passed at call time)
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
@@ -57,7 +58,8 @@ class EmailTemplate:
             "body_template": self.body_template,
             "parameters": [asdict(p) for p in self.parameters],
             "tool_id": self.tool_id,
-            "created_at": self.created_at
+            "created_at": self.created_at,
+            "sender_email": self.sender_email
         }
     
     @classmethod
@@ -72,7 +74,8 @@ class EmailTemplate:
             body_template=data["body_template"],
             parameters=params,
             tool_id=data.get("tool_id"),
-            created_at=data.get("created_at", datetime.utcnow().isoformat())
+            created_at=data.get("created_at", datetime.utcnow().isoformat()),
+            sender_email=data.get("sender_email")
         )
 
 
@@ -152,7 +155,8 @@ class EmailTemplateService:
         subject_template: str,
         body_template: str,
         parameters: Optional[List[Dict[str, Any]]] = None,
-        auto_create_tool: bool = True
+        auto_create_tool: bool = True,
+        sender_email: Optional[str] = None
     ) -> EmailTemplate:
         """
         Create an email template and optionally create the corresponding webhook tool.
@@ -164,6 +168,7 @@ class EmailTemplateService:
             body_template: Email body with placeholders
             parameters: List of parameter definitions. If not provided, auto-extracted from templates
             auto_create_tool: Whether to auto-create ElevenLabs webhook tool
+            sender_email: Optional default sender email (used for inbound when not passed at call time)
             
         Returns:
             Created EmailTemplate
@@ -196,7 +201,8 @@ class EmailTemplateService:
             description=description,
             subject_template=subject_template,
             body_template=body_template,
-            parameters=param_objects
+            parameters=param_objects,
+            sender_email=sender_email
         )
         
         # Create ElevenLabs webhook tool if requested
@@ -408,7 +414,8 @@ def load_templates_from_config(service: EmailTemplateService) -> int:
                     subject_template=template_config["subject_template"],
                     body_template=template_config["body_template"],
                     parameters=param_objects,
-                    tool_id=existing_tool_id
+                    tool_id=existing_tool_id,
+                    sender_email=template_config.get("sender_email")
                 )
                 
                 service._templates[template_id] = template
@@ -422,7 +429,8 @@ def load_templates_from_config(service: EmailTemplateService) -> int:
                     subject_template=template_config["subject_template"],
                     body_template=template_config["body_template"],
                     parameters=template_config.get("parameters"),
-                    auto_create_tool=True
+                    auto_create_tool=True,
+                    sender_email=template_config.get("sender_email")
                 )
                 loaded_count += 1
         

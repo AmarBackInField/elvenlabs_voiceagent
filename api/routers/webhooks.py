@@ -330,11 +330,36 @@ async def email_webhook(template_id: str, request: Request):
         else:
             sender_email = customer_info.get("sender_email")
         
+        # If still no customer_info, try to extract from request body parameters
+        # This handles inbound calls where user dictates their email during the conversation
+        if not customer_info:
+            # Look for email in various possible field names
+            user_email = (
+                body.get("email") or
+                body.get("customer_email") or
+                body.get("user_email") or
+                body.get("recipient_email")
+            )
+            # Look for name in various possible field names
+            user_name = (
+                body.get("name") or
+                body.get("customer_name") or
+                body.get("user_name") or
+                body.get("recipient_name")
+            )
+            
+            if user_email:
+                customer_info = {
+                    "name": user_name or "Customer",
+                    "email": user_email
+                }
+                logger.info(f"Built customer_info from request body: email={user_email}, name={user_name}")
+        
         if not customer_info:
             logger.warning(f"No customer info found for conversation_id={conversation_id}, agent_id={agent_id}, phone={to_phone}")
             return WebhookResponse(
                 success=False,
-                data=f"No customer info found. Please provide customer_info when starting the call or include email in batch recipients."
+                data=f"No customer info found. Please provide email parameter in the tool call, customer_info when starting the call, or include email in batch recipients."
             )
         
         # Verify we have an email address
@@ -367,7 +392,9 @@ async def email_webhook(template_id: str, request: Request):
             if k not in exclude_fields
         }
         
-        # Default sender email
+        # Default sender email: call/session/batch first, then template default (for inbound), then global fallback
+        if not sender_email and getattr(template, "sender_email", None):
+            sender_email = template.sender_email
         if not sender_email:
             sender_email = "amarc8399@gmail.com"
         
