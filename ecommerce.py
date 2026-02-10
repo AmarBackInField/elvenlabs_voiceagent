@@ -483,7 +483,8 @@ class BatchJobContextStore:
                         "name": r.get("name"),
                         "email": r.get("email"),
                         "job_id": job_id,
-                        "agent_id": agent_id
+                        "agent_id": agent_id,
+                        "dynamic_variables": r.get("dynamic_variables")
                     }
         
         logger.info(f"Stored batch job context: job_id={job_id}, agent_id={agent_id}, recipients={len(recipients or [])}")

@@ -100,12 +100,13 @@ async def submit_batch_job(
             if request.ecommerce_credentials:
                 ecom_creds = request.ecommerce_credentials.model_dump()
             
-            # Prepare recipient list with email info
+            # Prepare recipient list with email info and dynamic_variables
             recipients_with_email = [
                 {
                     "phone_number": r.phone_number,
                     "name": r.name,
-                    "email": r.email
+                    "email": r.email,
+                    "dynamic_variables": r.dynamic_variables
                 }
                 for r in request.recipients
             ]
