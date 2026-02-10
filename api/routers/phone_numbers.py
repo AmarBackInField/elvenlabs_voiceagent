@@ -358,6 +358,9 @@ async def twilio_outbound_call(
             # Include sender_email if provided
             if request.sender_email:
                 customer_data["sender_email"] = request.sender_email
+            # Store dynamic_variables so webhook can resolve e.g. customer_email when LLM passes variable name
+            if request.dynamic_variables:
+                customer_data["dynamic_variables"] = request.dynamic_variables
             customer_sessions.store(
                 conversation_id=conversation_id,
                 customer_info=customer_data

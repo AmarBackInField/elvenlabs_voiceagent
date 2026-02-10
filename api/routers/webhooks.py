@@ -355,6 +355,22 @@ async def email_webhook(template_id: str, request: Request):
                 }
                 logger.info(f"Built customer_info from request body: email={user_email}, name={user_name}")
         
+        # Resolve dynamic variable names when LLM passes e.g. "customer_email" instead of actual email
+        if customer_info:
+            dyn_vars = customer_info.get("dynamic_variables") or {}
+            email_val = customer_info.get("email") or customer_info.get("customer_email")
+            if email_val and "@" not in str(email_val).strip():
+                resolved = dyn_vars.get(email_val)
+                if resolved:
+                    customer_info["email"] = resolved
+                    logger.info(f"Resolved email from dynamic variable {email_val!r} to {resolved!r}")
+                else:
+                    logger.warning(f"Email looks like variable name ({email_val}) but could not resolve.")
+                    return WebhookResponse(
+                        success=False,
+                        data=f"Email parameter is the variable name '{email_val}', not an actual address. Start the outbound call from this server so the session can resolve it, or ensure the agent passes the actual email."
+                    )
+        
         if not customer_info:
             logger.warning(f"No customer info found for conversation_id={conversation_id}, agent_id={agent_id}, phone={to_phone}")
             return WebhookResponse(
