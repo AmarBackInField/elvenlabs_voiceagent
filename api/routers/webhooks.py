@@ -313,7 +313,8 @@ async def email_webhook(template_id: str, request: Request):
                 if recipient_info:
                     customer_info = {
                         "name": recipient_info.get("name"),
-                        "email": recipient_info.get("email")
+                        "email": recipient_info.get("email"),
+                        "dynamic_variables": recipient_info.get("dynamic_variables") or {},
                     }
                     # Get sender email from the job
                     job_agent_id = recipient_info.get("agent_id")

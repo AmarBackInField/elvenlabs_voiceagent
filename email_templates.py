@@ -316,13 +316,16 @@ class EmailTemplateService:
         if not template:
             raise ValueError(f"Template not found: {template_id}")
         
-        # Merge customer info with parameters
+        # Merge customer info, dynamic_variables (from call/batch), and tool parameters
+        # Order: base fields < dynamic_variables < parameters (parameters override)
+        dynamic_vars = customer_info.get("dynamic_variables") or {}
         all_values = {
             "customer_name": customer_info.get("name", customer_info.get("customer_name", "")),
             "customer_email": customer_info.get("email", customer_info.get("customer_email", "")),
             "name": customer_info.get("name", customer_info.get("customer_name", "")),
             "email": customer_info.get("email", customer_info.get("customer_email", "")),
-            **parameters
+            **dynamic_vars,
+            **parameters,
         }
         
         # Fill templates
