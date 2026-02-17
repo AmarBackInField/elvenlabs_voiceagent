@@ -4,6 +4,7 @@ Handles automation workflows for batch calling results and conversation callback
 Integrates with Zapier, Make, n8n, and custom webhooks.
 """
 
+import json
 import logging
 import httpx
 from typing import Optional, Dict, Any, List
@@ -484,7 +485,15 @@ class AppointmentExtraction(BaseModel):
 class ExtractDataRequest(BaseModel):
     """Request for extracting data from conversation."""
     conversation_id: str = Field(..., description="Conversation ID to analyze")
-    extraction_type: str = Field("appointment", description="Type of extraction: appointment, lead, support")
+    extraction_type: str = Field("appointment", description="Type of extraction: appointment, lead, support (used when extraction_prompt/json_example not provided)")
+    extraction_prompt: Optional[str] = Field(
+        None,
+        description="Custom prompt/behavior: what to extract from the conversation (e.g. 'Extract customer intent, product interest, and preferred contact time')"
+    )
+    json_example: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Example JSON structure for the response. Extracted data will match this shape (same keys, same types)."
+    )
     openai_api_key: Optional[str] = Field(None, description="OpenAI API key (uses env var if not provided)")
     
     class Config:
@@ -492,28 +501,42 @@ class ExtractDataRequest(BaseModel):
             "example": {
                 "conversation_id": "conv_xxx",
                 "extraction_type": "appointment"
-            }
+            },
+            "examples": [
+                {
+                    "summary": "Custom extraction with prompt and JSON example",
+                    "value": {
+                        "conversation_id": "conv_xxx",
+                        "extraction_prompt": "Extract whether they want a callback, their name, phone, and best time to call.",
+                        "json_example": {
+                            "wants_callback": True,
+                            "customer_name": "Jane Doe",
+                            "phone": "+1234567890",
+                            "best_time": "afternoon",
+                            "notes": None
+                        }
+                    }
+                }
+            ]
         }
 
 
 @router.post(
     "/extract-data",
     summary="Extract Structured Data from Conversation",
-    description="Use LLM to extract appointment details, lead info, or other structured data from transcript"
+    description="Use LLM to extract data from a conversation. Pass extraction_prompt (what to extract) and json_example (desired shape); response extracted_data will match that JSON format."
 )
 async def extract_conversation_data(request: ExtractDataRequest):
     """
     Extract structured data from a conversation transcript using LLM.
     
-    For appointment extraction, returns:
-    - wants_appointment: true/false
-    - appointment_date: YYYY-MM-DD
-    - appointment_time: HH:MM (24hr)
-    - purpose: reason for appointment
-    - customer_name: if mentioned
-    - additional_notes: other details
+    **Custom extraction (recommended):** Pass both:
+    - **extraction_prompt**: What to extract (e.g. "Extract callback preference, name, phone, best time").
+    - **json_example**: Example JSON with the exact keys and types you want. The response `extracted_data` will follow this same structure.
     
-    Requires OPENAI_API_KEY environment variable or passed in request.
+    **Built-in types:** If you omit extraction_prompt and json_example, use extraction_type: "appointment", "lead", or "support" for fixed schemas.
+    
+    Requires OPENAI_API_KEY (env or request) for LLM extraction.
     """
     import os
     import json
@@ -542,11 +565,23 @@ async def extract_conversation_data(request: ExtractDataRequest):
         api_key = request.openai_api_key or os.getenv("OPENAI_API_KEY")
         
         if not api_key:
-            # Fallback to rule-based extraction
-            return await _extract_appointment_rules(request.conversation_id, transcript_text, transcript)
+            # Fallback to rule-based extraction only for built-in types
+            if not (request.extraction_prompt and request.json_example):
+                return await _extract_appointment_rules(request.conversation_id, transcript_text, transcript)
+            raise HTTPException(
+                status_code=400,
+                detail="OPENAI_API_KEY required for custom extraction (extraction_prompt + json_example). Set env or pass openai_api_key."
+            )
         
-        # Use OpenAI for extraction
-        extraction_prompt = _get_extraction_prompt(request.extraction_type, transcript_text)
+        # Use custom prompt + JSON example if provided; otherwise use extraction_type
+        if request.extraction_prompt and request.json_example:
+            extraction_prompt = _build_custom_extraction_prompt(
+                request.extraction_prompt,
+                request.json_example,
+                transcript_text
+            )
+        else:
+            extraction_prompt = _get_extraction_prompt(request.extraction_type, transcript_text)
         
         async with httpx.AsyncClient(timeout=30.0) as http_client:
             response = await http_client.post(
@@ -587,6 +622,22 @@ async def extract_conversation_data(request: ExtractDataRequest):
     except Exception as e:
         logger.error(f"Extraction error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+def _build_custom_extraction_prompt(behavior: str, json_example: Dict[str, Any], transcript: str) -> str:
+    """Build extraction prompt from custom behavior and desired JSON shape."""
+    example_str = json.dumps(json_example, indent=2)
+    return f"""Follow these extraction instructions:
+
+{behavior}
+
+CONVERSATION TRANSCRIPT:
+{transcript}
+
+Return a single JSON object with the same structure and keys as this example. Use the same types (string, number, boolean, null, array). If a value cannot be determined from the conversation, use null. Output only valid JSON, no markdown or explanation.
+
+Example structure (match this format):
+{example_str}"""
 
 
 def _get_extraction_prompt(extraction_type: str, transcript: str) -> str:
