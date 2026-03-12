@@ -86,7 +86,8 @@ async def create_agent(
                 system_prompt=request.system_prompt,
                 language=request.language,
                 tool_ids=request.tool_ids,
-                knowledge_base_ids=request.knowledge_base_ids
+                knowledge_base_ids=request.knowledge_base_ids,
+                model=request.model
             )
         
         return CreateAgentResponse(agent_id=result["agent_id"])

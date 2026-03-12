@@ -75,7 +75,11 @@ class CreateAgentRequest(BaseModel):
         None,
         description="List of knowledge base document IDs to enable for this agent"
     )
-    
+    model: Optional[str] = Field(
+        default="qwen3-30b-a3b",
+        description="LLM model for the agent (default: qwen3-30b-a3b). Omit from request body to use default."
+    )
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -85,7 +89,8 @@ class CreateAgentRequest(BaseModel):
                 "system_prompt": "You are a helpful customer support agent.",
                 "language": "en",
                 "tool_ids": ["tool_abc123", "tool_xyz789"],
-                "knowledge_base_ids": ["doc_abc123", "doc_xyz789"]
+                "knowledge_base_ids": ["doc_abc123", "doc_xyz789"],
+                "model": "qwen3-30b-a3b"
             }
         }
 

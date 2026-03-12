@@ -54,6 +54,7 @@ class AgentService(BaseClient):
         language: str = "en",
         tool_ids: Optional[List[str]] = None,
         knowledge_base_ids: Optional[List[str]] = None,
+        model: Optional[str] = "qwen3-30b-a3b",
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -70,6 +71,8 @@ class AgentService(BaseClient):
             system_prompt: System prompt defining agent behavior
             language: Agent language (default: "en")
             tool_ids: List of tool IDs to enable for this agent
+            knowledge_base_ids: List of knowledge base document IDs
+            model: LLM model (e.g. gemini-2.5-flash, qwen3-30b-a3b)
             **kwargs: Additional configuration options
             
         Returns:
@@ -114,7 +117,11 @@ class AgentService(BaseClient):
                 # Add tools to prompt config (tool_ids is a list of strings)
                 if tool_ids:
                     prompt_config["tool_ids"] = tool_ids
-                
+
+                # LLM model (e.g. gemini-2.5-flash, qwen3-30b-a3b)
+                if model:
+                    prompt_config["llm"] = model
+
                 # Add knowledge base documents (list of objects with id, type, and name)
                 # Type can be: 'file', 'url', 'text', or 'folder'
                 if knowledge_base_ids:
