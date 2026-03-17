@@ -273,7 +273,7 @@ class KnowledgeBaseService(BaseClient):
             self.logger.info(f"Retrieved {count} KB documents")
             return response
     
-    def delete_document(self, document_id: str, force: bool = False) -> Dict[str, Any]:
+    def delete_document(self, document_id: str, force: bool = True) -> Dict[str, Any]:
         """
         Delete a knowledge base document.
         

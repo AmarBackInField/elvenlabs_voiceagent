@@ -272,7 +272,7 @@ async def get_document(
 )
 async def delete_document(
     document_id: str,
-    force: bool = Query(False, description="Force delete even when document is used by agents"),
+    force: bool = Query(True, description="Force delete even when document is used by agents (default: true)"),
     client: ElevenLabsClient = Depends(get_client)
 ):
     """Delete a knowledge base document. Set force=true to delete when in use by agents."""
