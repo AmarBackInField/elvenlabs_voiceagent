@@ -236,6 +236,14 @@ app.include_router(
     tags=["Automation"]
 )
 
+# Booked Slots router - /api/v1/booked-slots, current-datetime-cst, register-tool, register-datetime-tool
+from api.routers.booked_slots import router as booked_slots_router
+app.include_router(
+    booked_slots_router,
+    prefix="/api/v1",
+    tags=["Booked Slots"]
+)
+
 
 # =============================================================================
 # Root Endpoints
@@ -257,7 +265,11 @@ async def root():
             "agents": "/api/v1/agents",
             "phone_numbers": "/api/v1/phone-numbers",
             "sip_trunk": "/api/v1/sip-trunk",
-            "batch_calling": "/api/v1/batch-calling"
+            "batch_calling": "/api/v1/batch-calling",
+            "booked_slots": "/api/v1/booked-slots",
+            "current_datetime_cst": "/api/v1/current-datetime-cst",
+            "register_tool": "/api/v1/register-tool",
+            "register_datetime_tool": "/api/v1/register-datetime-tool"
         }
     }
 
