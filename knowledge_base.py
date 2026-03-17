@@ -273,20 +273,23 @@ class KnowledgeBaseService(BaseClient):
             self.logger.info(f"Retrieved {count} KB documents")
             return response
     
-    def delete_document(self, document_id: str) -> Dict[str, Any]:
+    def delete_document(self, document_id: str, force: bool = False) -> Dict[str, Any]:
         """
         Delete a knowledge base document.
         
         Args:
             document_id: Document ID to delete
+            force: If True, delete even when document is in use by agents (removes from agents)
             
         Returns:
             Deletion confirmation
         """
         with APICallLogger(self.logger, "Delete KB Document", document_id=document_id):
+            params = {"force": "true"} if force else None
             response = self._make_request(
                 method="DELETE",
-                endpoint=f"{self.KB_BASE_ENDPOINT}/{document_id}"
+                endpoint=f"{self.KB_BASE_ENDPOINT}/{document_id}",
+                params=params
             )
             
             self.logger.info(f"Deleted KB document: {document_id}")

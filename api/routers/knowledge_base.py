@@ -264,16 +264,20 @@ async def get_document(
     "/{document_id}",
     response_model=SuccessResponse,
     summary="Delete Document",
-    description="Delete a knowledge base document",
-    responses={404: {"model": ErrorResponse, "description": "Document not found"}}
+    description="Delete a knowledge base document. Use force=true if document is in use by agents.",
+    responses={
+        404: {"model": ErrorResponse, "description": "Document not found"},
+        409: {"model": ErrorResponse, "description": "Document in use by agents (use force=true)"}
+    }
 )
 async def delete_document(
     document_id: str,
+    force: bool = Query(False, description="Force delete even when document is used by agents"),
     client: ElevenLabsClient = Depends(get_client)
 ):
-    """Delete a knowledge base document."""
+    """Delete a knowledge base document. Set force=true to delete when in use by agents."""
     try:
-        client.knowledge_base.delete_document(document_id)
+        client.knowledge_base.delete_document(document_id, force=force)
         return SuccessResponse(message=f"Document {document_id} deleted successfully")
     except NotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
