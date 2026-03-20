@@ -1,6 +1,6 @@
 """
 Booked Slots & Datetime Tools Router.
-Proxy for Montessori booked-slots and ElevenLabs webhook tools (booked slots, current datetime CST).
+Proxy for calendar availability and ElevenLabs webhook tools (booked slots, current datetime CST).
 """
 
 import os
@@ -18,7 +18,7 @@ from api.schemas import ErrorResponse
 WEBHOOK_BASE_URL = (os.getenv("WEBHOOK_BASE_URL", "https://elvenlabs-voiceagent.onrender.com") or "").rstrip("/")
 BOOKED_SLOTS_API_URL = os.getenv(
     "BOOKED_SLOTS_API_URL",
-    "https://montessori-enrollment-ai-backend.onrender.com/api/voice/booked-slots",
+    "https://calender-lookup.onrender.com/api/calendar/availability",
 )
 DEFAULT_SCHOOL_ID = os.getenv("SCHOOL_ID", "69a2a7bf84844ca0d53116d6")
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
@@ -113,10 +113,10 @@ async def get_booked_slots(
 @router.post(
     "/register-tool",
     summary="Register Tool",
-    description="Register the booked-slots webhook tool with ElevenLabs for the given school_id. Optionally attach to an agent.",
+    description="Register get_booked_slots with ElevenLabs. Webhook URL is BOOKED_SLOTS_API_URL (default: calender-lookup calendar/availability). Optionally attach to an agent.",
 )
 async def register_tool(body: RegisterToolRequest):
-    """Register an ElevenLabs webhook tool for the given school_id. The tool only asks the agent for 'date' (YYYY-MM-DD); schoolId is fixed."""
+    """Register tool pointing at calendar availability API; agent supplies date, schoolId is fixed from school_id."""
     if not ELEVENLABS_API_KEY:
         raise HTTPException(status_code=503, detail="ELEVENLABS_API_KEY not configured in .env")
     if not ELEVENLABS_BASE_URL:
@@ -125,8 +125,8 @@ async def register_tool(body: RegisterToolRequest):
     if not school_id:
         raise HTTPException(status_code=422, detail="school_id cannot be empty")
 
-    base = (WEBHOOK_BASE_URL or "http://localhost:8000").rstrip("/")
-    webhook_url = f"{base}/api/v1/booked-slots"
+    # Point ElevenLabs at calendar-lookup directly (same query params as /api/v1/booked-slots proxy)
+    webhook_url = BOOKED_SLOTS_API_URL.rstrip("/")
     payload = {
         "tool_config": {
             "type": "webhook",
