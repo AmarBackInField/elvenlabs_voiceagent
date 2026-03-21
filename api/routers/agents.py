@@ -21,6 +21,34 @@ from api.schemas import (
 from exceptions import ElevenLabsError, NotFoundError
 
 
+def _normalize_https_url(url: str) -> str:
+    u = (url or "").strip()
+    if not u:
+        return u
+    if u.startswith("http://"):
+        u = "https://" + u[len("http://") :]
+    elif not u.startswith("https://"):
+        u = "https://" + u
+    return u
+
+
+def _merge_post_call_webhook_platform_settings(
+    agent: dict,
+    post_call_webhook_id: str,
+    events: List[str],
+) -> dict:
+    """Set platform_settings.workspace_overrides.webhooks for post-call."""
+    ps = dict(agent.get("platform_settings") or {})
+    wo = dict(ps.get("workspace_overrides") or {})
+    existing = wo.get("webhooks")
+    wh = dict(existing) if isinstance(existing, dict) else {}
+    wh["post_call_webhook_id"] = post_call_webhook_id
+    wh["events"] = events
+    wo["webhooks"] = wh
+    ps["workspace_overrides"] = wo
+    return ps
+
+
 class UpdateAgentPromptRequest(BaseModel):
     """Request to update agent's prompt configuration."""
     first_message: Optional[str] = Field(None, description="Initial greeting message")
@@ -28,7 +56,27 @@ class UpdateAgentPromptRequest(BaseModel):
     system_prompt: Optional[str] = Field(None, description="System prompt defining agent behavior")
     tool_ids: Optional[List[str]] = Field(None, description="List of tool IDs to enable (replaces existing tools)")
     knowledge_base_ids: Optional[List[str]] = Field(None, description="List of knowledge base document IDs")
-    
+    post_call_webhook_url: Optional[str] = Field(
+        None,
+        description=(
+            "HTTPS URL for post-call webhook (e.g. Montessori). "
+            "Reuses an existing workspace webhook with the same URL, or creates a new HMAC webhook, "
+            "then assigns it to this agent."
+        ),
+    )
+    post_call_webhook_id: Optional[str] = Field(
+        None,
+        description="Existing ElevenLabs workspace webhook ID to use for post-call (skips create/lookup by URL).",
+    )
+    post_call_webhook_name: Optional[str] = Field(
+        None,
+        description="Display name when creating a new workspace webhook (default: Post-call webhook).",
+    )
+    post_call_webhook_events: Optional[List[str]] = Field(
+        None,
+        description="ConvAI webhook events: transcript, audio, call_initiation_failure (default: ['transcript']).",
+    )
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -36,7 +84,8 @@ class UpdateAgentPromptRequest(BaseModel):
                 "language": "en",
                 "system_prompt": "You are a helpful customer support agent.",
                 "tool_ids": ["tool_products_abc123", "tool_orders_def456", "tool_email_xyz789"],
-                "knowledge_base_ids": ["doc_faq123", "doc_policies456"]
+                "knowledge_base_ids": ["doc_faq123", "doc_policies456"],
+                "post_call_webhook_url": "https://montessori-enrollment-ai-backend.onrender.com/api/v1/webhook/elevenlabs",
             }
         }
 
@@ -171,7 +220,7 @@ async def update_agent(
     "/{agent_id}/prompt",
     response_model=AgentResponse,
     summary="Update Agent Prompt",
-    description="Update only the agent's first message, language, and/or system prompt",
+    description="Update prompt, tools, KB, and/or post-call webhook (workspace webhook URL or ID)",
     responses={404: {"model": ErrorResponse, "description": "Agent not found"}}
 )
 async def update_agent_prompt(
@@ -188,7 +237,10 @@ async def update_agent_prompt(
     - system_prompt: The behavior instructions
     - tool_ids: List of tool IDs to enable
     - knowledge_base_ids: List of knowledge base document IDs
-    
+    - post_call_webhook_url: Post-call callback URL (creates or reuses workspace HMAC webhook, assigns to agent)
+    - post_call_webhook_id: Or set an existing workspace webhook ID directly
+    - post_call_webhook_events: Optional event list (default transcript)
+
     Only provided fields will be updated.
     """
     try:
@@ -228,17 +280,59 @@ async def update_agent_prompt(
             conversation_config["agent"] = agent_config
         if tts_config:
             conversation_config["tts"] = tts_config
-        
-        if not conversation_config:
+
+        platform_settings = None
+        post_call_meta: dict = {}
+
+        pid = (request.post_call_webhook_id or "").strip() if request.post_call_webhook_id else None
+        if pid:
+            resolved_id = pid
+        elif request.post_call_webhook_url is not None:
+            wh_url = _normalize_https_url(request.post_call_webhook_url)
+            if not wh_url:
+                raise HTTPException(status_code=422, detail="post_call_webhook_url cannot be empty when provided")
+            resolved_id = client.workspace_webhooks.find_webhook_id_by_url(wh_url)
+            if not resolved_id:
+                created = client.workspace_webhooks.create_hmac_webhook(
+                    request.post_call_webhook_name or "Post-call webhook",
+                    wh_url,
+                )
+                resolved_id = (created.get("webhook_id") or created.get("id") or "").strip()
+                if not resolved_id:
+                    raise HTTPException(
+                        status_code=502,
+                        detail="ElevenLabs did not return webhook_id after creating workspace webhook",
+                    )
+                if created.get("webhook_secret"):
+                    post_call_meta["post_call_webhook_secret"] = created["webhook_secret"]
+                post_call_meta["post_call_webhook_created"] = True
+        else:
+            resolved_id = None
+
+        if resolved_id:
+            events = request.post_call_webhook_events or ["transcript"]
+            agent = client.agents.get_agent(agent_id)
+            platform_settings = _merge_post_call_webhook_platform_settings(agent, resolved_id, events)
+            post_call_meta["post_call_webhook_id"] = resolved_id
+
+        if not conversation_config and platform_settings is None:
             raise HTTPException(
-                status_code=400, 
-                detail="At least one field must be provided: first_message, language, system_prompt, tool_ids, or knowledge_base_ids"
+                status_code=400,
+                detail=(
+                    "At least one field must be provided: first_message, language, system_prompt, "
+                    "tool_ids, knowledge_base_ids, post_call_webhook_url, or post_call_webhook_id"
+                ),
             )
-        
-        result = client.agents.update_agent(
-            agent_id=agent_id,
-            conversation_config=conversation_config
-        )
+
+        update_kwargs: dict = {}
+        if conversation_config:
+            update_kwargs["conversation_config"] = conversation_config
+        if platform_settings is not None:
+            update_kwargs["platform_settings"] = platform_settings
+
+        result = client.agents.update_agent(agent_id, **update_kwargs)
+        if post_call_meta:
+            result = {**result, **post_call_meta}
         return AgentResponse(**result)
         
     except NotFoundError as e:

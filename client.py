@@ -14,6 +14,7 @@ from batch_calling import BatchCallingService
 from conversations import ConversationService
 from knowledge_base import KnowledgeBaseService
 from tools import ToolsService
+from workspace_webhooks import WorkspaceWebhookService
 
 
 class ElevenLabsClient:
@@ -105,7 +106,8 @@ class ElevenLabsClient:
         self.conversations = ConversationService(self.config)
         self.knowledge_base = KnowledgeBaseService(self.config)
         self.tools = ToolsService(self.config)
-        
+        self.workspace_webhooks = WorkspaceWebhookService(self.config)
+
         self.logger.info(f"ElevenLabsClient initialized with base URL: {self.config.base_url}")
     
     def health_check(self) -> bool:
@@ -132,6 +134,7 @@ class ElevenLabsClient:
         self.conversations.close()
         self.knowledge_base.close()
         self.tools.close()
+        self.workspace_webhooks.close()
         self.logger.info("All client sessions closed")
     
     def __enter__(self):
